@@ -11,6 +11,22 @@ from services.historique import (
 )
 from constants import CATEGORIES_ASSETS
 
+
+CATEGORY_COLORS = [
+    "#4C9BE8", "#36C28A", "#F5A623", "#E8547A",
+    "#A78BFA", "#34D8E0", "#F97316", "#8BC34A",
+]
+
+PLOTLY_LAYOUT = dict(
+    paper_bgcolor="#1A1D27",
+    plot_bgcolor="#1A1D27",
+    font=dict(color="#E8EAF0", family="sans-serif"),
+    xaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
+    yaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
+    margin=dict(l=0, r=0, t=0, b=0),
+    hovermode=False,
+)
+
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
 init_storage()
 init_historique()
@@ -49,9 +65,12 @@ if "editing_idx" in st.session_state:
                                  index=CATEGORIES_ASSETS.index(row["categorie"]))
         montant = st.number_input("Montant", min_value=0.0, value=row["montant"], step=100.0)
 
-        if st.form_submit_button("Sauvegarder"):
+        if st.form_submit_button("Sauvegarder", type="primary"):
             df = update_asset(df, idx, nom, categorie, montant)
             st.toast("Actif modifié")
+            del st.session_state["editing_idx"]
+            st.rerun()
+        if st.form_submit_button("Annuler", type="secondary"):
             del st.session_state["editing_idx"]
             st.rerun()
 
@@ -61,12 +80,16 @@ if "deleting_idx" in st.session_state:
     idx = st.session_state["deleting_idx"]
     row = df.loc[idx]
 
-    st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
-    if st.button("Confirmer la suppression", key=f"confirm_del_{idx}"):
-        df = delete_asset(df, idx)
-        st.toast("Actif supprimé")
-        del st.session_state["deleting_idx"]
-        st.rerun()
+    with st.container(border=True):
+        st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
+        if st.button("Confirmer la suppression", key=f"confirm_del_{idx}",type="primary"):
+            df = delete_asset(df, idx)
+            st.toast("Actif supprimé")
+            del st.session_state["deleting_idx"]
+            st.rerun()
+        if st.button("Annuler", key=f"cancel_del_{idx}"):
+            del st.session_state["deleting_idx"]
+            st.rerun()
 
 # ── Ajout d'un actif ──────────────────────────────────────────────────────────
 
@@ -106,7 +129,7 @@ df_hist = load_historique()
 # Enregistrer un snapshot
 col_snap, col_info = st.columns([2, 5])
 with col_snap:
-    if st.button("📸 Enregistrer un snapshot", disabled=df.empty):
+    if st.button("📸 Enregistrer un snapshot", disabled=df.empty, use_container_width=True):
         saved = save_snapshot(df)
         if saved:
             st.toast("Snapshot enregistré")
@@ -125,35 +148,38 @@ else:
     fig_total.add_trace(go.Scatter(
         x=total_evo["date"], y=total_evo["total"],
         mode="lines+markers", name="Total",
-        line=dict(color="#4C9BE8", width=2),
+        line=dict(color=CATEGORY_COLORS[0], width=2),
         marker=dict(size=5),
     ))
     fig_total.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
+        **PLOTLY_LAYOUT,
         yaxis_title="Patrimoine (€)",
         xaxis_title="Date",
-        hovermode=False,
     )
-    st.plotly_chart(fig_total, config={"staticPlot": True})
+    st.plotly_chart(fig_total, use_container_width=True,
+                    config={"staticPlot": True})
 
     # Courbes — par catégorie
     st.subheader("Évolution par catégorie")
     cat_evo = get_category_evolution(df_hist)
     fig_cat = go.Figure()
-    for col in cat_evo.columns:
+    for i, col in enumerate(cat_evo.columns):
+        color = CATEGORY_COLORS[i % len(CATEGORY_COLORS)]
         fig_cat.add_trace(go.Scatter(
             x=cat_evo.index, y=cat_evo[col],
             mode="lines+markers", name=col,
-            marker=dict(size=5),
+            line=dict(color=color, width=2),
+            marker=dict(size=5, color=color),
         ))
     fig_cat.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
+        **PLOTLY_LAYOUT,
         yaxis_title="Montant (€)",
         xaxis_title="Date",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        hovermode=False,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                    bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
     )
-    st.plotly_chart(fig_cat, config={"staticPlot": True})
+    st.plotly_chart(fig_cat, use_container_width=True,
+                    config={"staticPlot": True})
 
     # Tableau des snapshots
     st.subheader("Tableau des snapshots")
@@ -163,7 +189,7 @@ else:
     formatted = snap_table.copy()
     for col in formatted.columns:
         formatted[col] = formatted[col].apply(lambda x: f"{x:,.2f} €")
-    st.dataframe(formatted)
+    st.dataframe(formatted, use_container_width=True)
 
     # Suppression d'un snapshot
     with st.expander("Supprimer un snapshot"):
