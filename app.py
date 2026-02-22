@@ -10,22 +10,8 @@ from services.historique import (
     get_total_evolution, get_category_evolution, get_snapshot_table,
     get_last_two_snapshots_totals,
 )
-from constants import CATEGORIES_ASSETS
+from constants import CATEGORIES_ASSETS, CATEGORY_COLORS, PLOTLY_LAYOUT
 
-CATEGORY_COLORS = [
-    "#4C9BE8", "#36C28A", "#F5A623", "#E8547A",
-    "#A78BFA", "#34D8E0", "#F97316", "#8BC34A",
-]
-
-PLOTLY_LAYOUT = dict(
-    paper_bgcolor="#1A1D27",
-    plot_bgcolor="#1A1D27",
-    font=dict(color="#E8EAF0", family="sans-serif"),
-    xaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
-    yaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
-    margin=dict(l=0, r=0, t=0, b=0),
-    hovermode=False,
-)
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
 init_storage()
@@ -156,17 +142,36 @@ with tab_actifs:
     stats = compute_by_category(df)
     if not stats.empty:
         st.subheader("Répartition par catégorie")
-        display = stats.copy()
-        if dernier and avant_dernier:
-            display["delta"] = display.apply(
-                lambda r: dernier["par_categorie"].get(r["categorie"], 0)
-                        - avant_dernier["par_categorie"].get(r["categorie"], 0),
-                axis=1,
+
+        col_pie, col_table = st.columns([2, 1])
+
+        with col_pie:
+            fig_pie = go.Figure(go.Pie(
+                labels=stats["categorie"],
+                values=stats["montant"],
+                marker=dict(colors=CATEGORY_COLORS[:len(stats)]),
+                textinfo="label+percent",
+                textfont=dict(color="#E8EAF0", size=13),
+                hole=0.35,
+            ))
+            fig_pie.update_layout(
+                **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
+                showlegend=False,
             )
-            display["delta"] = display["delta"].apply(lambda x: f"{x:+,.2f} €")
-        display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
-        display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
-        st.table(display.set_index("categorie"))
+            st.plotly_chart(fig_pie, use_container_width=True, config={"staticPlot": True})
+
+        with col_table:
+            display = stats.copy()
+            if dernier and avant_dernier:
+                display["delta"] = display.apply(
+                    lambda r: dernier["par_categorie"].get(r["categorie"], 0)
+                            - avant_dernier["par_categorie"].get(r["categorie"], 0),
+                    axis=1,
+                )
+                display["delta"] = display["delta"].apply(lambda x: f"{x:+,.2f} €")
+            display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
+            display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
+            st.table(display.set_index("categorie"))
 
 # ── Tab Historique ────────────────────────────────────────────────────────────
 
