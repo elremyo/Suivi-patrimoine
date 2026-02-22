@@ -19,13 +19,16 @@ else:
     # --- Ici tu ajoutes la section modification ---
     for idx, row in df.iterrows():
         with st.container(border=True,vertical_alignment="center"):
-            cols = st.columns([3, 2, 2, 2])
+            cols = st.columns([3, 2, 2, 2, 2])
             cols[0].write(row["nom"])
             cols[1].write(row["categorie"])
             cols[2].write(row["montant"])
         
         if cols[3].button("Modifier", key=f"mod_{idx}"):
             st.session_state["editing_idx"] = idx
+        
+        if cols[4].button("Supprimer", key=f"del_{idx}"):
+            st.session_state["deleting_idx"] = idx
 
     if "editing_idx" in st.session_state:
         idx = st.session_state["editing_idx"]
@@ -43,6 +46,18 @@ else:
                 save_assets(df)
                 st.toast("Actif modifié")
                 del st.session_state["editing_idx"]
+                st.rerun()
+
+    if "deleting_idx" in st.session_state:
+        idx = st.session_state["deleting_idx"]
+        row = df.loc[idx]
+
+        if st.warning(f"Supprimer {row['nom']} ? Cette action est irréversible."):
+            if st.button("Confirmer la suppression", key=f"confirm_del_{idx}"):
+                df = df.drop(index=idx).reset_index(drop=True)
+                save_assets(df)
+                st.toast("Actif supprimé")
+                del st.session_state["deleting_idx"]
                 st.rerun()
 
 st.subheader("Ajouter un actif")
