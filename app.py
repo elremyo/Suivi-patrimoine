@@ -39,7 +39,6 @@ with st.sidebar:
     st.title("Suivi de patrimoine")
     st.divider()
 
-    # Ajout d'un actif
     st.subheader("Ajouter un actif")
     with st.form("add_asset", clear_on_submit=True):
         nom = st.text_input("Nom")
@@ -56,7 +55,6 @@ with st.sidebar:
 
     st.divider()
 
-    # Snapshot
     st.subheader("Historique")
     if st.button("📸 Enregistrer un snapshot", disabled=df.empty, use_container_width=True, type="primary"):
         if save_snapshot(df):
@@ -66,7 +64,6 @@ with st.sidebar:
 
     st.divider()
 
-    # Export
     st.subheader("Exporter")
     if st.download_button(
         "Télécharger le patrimoine",
@@ -82,132 +79,129 @@ with st.sidebar:
 
 st.title("Suivi de patrimoine")
 
-# ── Liste des actifs ──────────────────────────────────────────────────────────
+tab_actifs, tab_historique = st.tabs(["📋 Actifs", "📈 Historique"])
 
-st.subheader("Actifs")
+# ── Tab Actifs ────────────────────────────────────────────────────────────────
 
-if df.empty:
-    st.info("Aucun actif enregistré. Utilisez le panneau latéral pour en ajouter un.")
-else:
-    for idx, row in df.iterrows():
-        with st.container(border=True, vertical_alignment="center"):
-            cols = st.columns([3, 2, 2, 1, 1])
-            cols[0].write(row["nom"])
-            cols[1].write(row["categorie"])
-            cols[2].write(f"{row['montant']:,.2f} €")
-            if cols[3].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
-                st.session_state["editing_idx"] = idx
-            if cols[4].button("", key=f"del_{idx}", icon=":material/delete:"):
-                st.session_state["deleting_idx"] = idx
+with tab_actifs:
 
-# ── Formulaire de modification ────────────────────────────────────────────────
+    st.subheader("Actifs")
 
-if "editing_idx" in st.session_state:
-    idx = st.session_state["editing_idx"]
-    row = df.loc[idx]
+    if df.empty:
+        st.info("Aucun actif enregistré. Utilisez le panneau latéral pour en ajouter un.")
+    else:
+        for idx, row in df.iterrows():
+            with st.container(border=True, vertical_alignment="center"):
+                cols = st.columns([3, 2, 2, 1, 1])
+                cols[0].write(row["nom"])
+                cols[1].write(row["categorie"])
+                cols[2].write(f"{row['montant']:,.2f} €")
+                if cols[3].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
+                    st.session_state["editing_idx"] = idx
+                if cols[4].button("", key=f"del_{idx}", icon=":material/delete:"):
+                    st.session_state["deleting_idx"] = idx
 
-    with st.form("edit_asset"):
-        nom = st.text_input("Nom", value=row["nom"])
-        categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
-                                 index=CATEGORIES_ASSETS.index(row["categorie"]))
-        montant = st.number_input("Montant", min_value=0.0, value=row["montant"], step=100.0)
-        c1, c2 = st.columns(2)
-        if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-            df = update_asset(df, idx, nom, categorie, montant)
-            st.toast("Actif modifié")
-            del st.session_state["editing_idx"]
-            st.rerun()
-        if c2.form_submit_button("Annuler", use_container_width=True):
-            del st.session_state["editing_idx"]
-            st.rerun()
+    if "editing_idx" in st.session_state:
+        idx = st.session_state["editing_idx"]
+        row = df.loc[idx]
 
-# ── Confirmation de suppression ───────────────────────────────────────────────
+        with st.form("edit_asset"):
+            nom = st.text_input("Nom", value=row["nom"])
+            categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
+                                     index=CATEGORIES_ASSETS.index(row["categorie"]))
+            montant = st.number_input("Montant", min_value=0.0, value=row["montant"], step=100.0)
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
+                df = update_asset(df, idx, nom, categorie, montant)
+                st.toast("Actif modifié")
+                del st.session_state["editing_idx"]
+                st.rerun()
+            if c2.form_submit_button("Annuler", use_container_width=True):
+                del st.session_state["editing_idx"]
+                st.rerun()
 
-if "deleting_idx" in st.session_state:
-    idx = st.session_state["deleting_idx"]
-    row = df.loc[idx]
+    if "deleting_idx" in st.session_state:
+        idx = st.session_state["deleting_idx"]
+        row = df.loc[idx]
 
-    with st.container(border=True):
-        st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
-        c1, c2 = st.columns(2)
-        if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
-            df = delete_asset(df, idx)
-            st.toast("Actif supprimé")
-            del st.session_state["deleting_idx"]
-            st.rerun()
-        if c2.button("Annuler", key=f"cancel_del_{idx}", use_container_width=True):
-            del st.session_state["deleting_idx"]
-            st.rerun()
+        with st.container(border=True):
+            st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
+            c1, c2 = st.columns(2)
+            if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
+                df = delete_asset(df, idx)
+                st.toast("Actif supprimé")
+                del st.session_state["deleting_idx"]
+                st.rerun()
+            if c2.button("Annuler", key=f"cancel_del_{idx}", use_container_width=True):
+                del st.session_state["deleting_idx"]
+                st.rerun()
 
-# ── Statistiques actuelles ────────────────────────────────────────────────────
+    st.divider()
 
-st.divider()
+    total = compute_total(df)
+    st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
 
-total = compute_total(df)
-st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+    stats = compute_by_category(df)
+    if not stats.empty:
+        st.subheader("Répartition par catégorie")
+        display = stats.copy()
+        display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
+        display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
+        st.table(display.set_index("categorie"))
 
-stats = compute_by_category(df)
-if not stats.empty:
-    st.subheader("Répartition par catégorie")
-    display = stats.copy()
-    display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
-    display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
-    st.table(display.set_index("categorie"))
+# ── Tab Historique ────────────────────────────────────────────────────────────
 
-# ── Historique ────────────────────────────────────────────────────────────────
+with tab_historique:
 
-st.divider()
-st.subheader("Historique")
-
-if df_hist.empty:
-    st.info("Aucun historique. Enregistrez un premier snapshot depuis le panneau latéral.")
-else:
-    st.subheader("Évolution du patrimoine total")
-    total_evo = get_total_evolution(df_hist)
-    fig_total = go.Figure()
-    fig_total.add_trace(go.Scatter(
-        x=total_evo["date"], y=total_evo["total"],
-        mode="lines+markers", name="Total",
-        line=dict(color=CATEGORY_COLORS[0], width=2),
-        marker=dict(size=5),
-    ))
-    fig_total.update_layout(**PLOTLY_LAYOUT, yaxis_title="Patrimoine (€)", xaxis_title="Date")
-    st.plotly_chart(fig_total, use_container_width=True, config={"staticPlot": True})
-
-    st.subheader("Évolution par catégorie")
-    cat_evo = get_category_evolution(df_hist)
-    fig_cat = go.Figure()
-    for i, col in enumerate(cat_evo.columns):
-        color = CATEGORY_COLORS[i % len(CATEGORY_COLORS)]
-        fig_cat.add_trace(go.Scatter(
-            x=cat_evo.index, y=cat_evo[col],
-            mode="lines+markers", name=col,
-            line=dict(color=color, width=2),
-            marker=dict(size=5, color=color),
+    if df_hist.empty:
+        st.info("Aucun historique. Enregistrez un premier snapshot depuis le panneau latéral.")
+    else:
+        st.subheader("Évolution du patrimoine total")
+        total_evo = get_total_evolution(df_hist)
+        fig_total = go.Figure()
+        fig_total.add_trace(go.Scatter(
+            x=total_evo["date"], y=total_evo["total"],
+            mode="lines+markers", name="Total",
+            line=dict(color=CATEGORY_COLORS[0], width=2),
+            marker=dict(size=5),
         ))
-    fig_cat.update_layout(
-        **PLOTLY_LAYOUT,
-        yaxis_title="Montant (€)", xaxis_title="Date",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
-    )
-    st.plotly_chart(fig_cat, use_container_width=True, config={"staticPlot": True})
+        fig_total.update_layout(**PLOTLY_LAYOUT, yaxis_title="Patrimoine (€)", xaxis_title="Date")
+        st.plotly_chart(fig_total, use_container_width=True, config={"staticPlot": True})
 
-    st.subheader("Tableau des snapshots")
-    snap_table = get_snapshot_table(df_hist)
-    formatted = snap_table.copy()
-    for col in formatted.columns:
-        formatted[col] = formatted[col].apply(lambda x: f"{x:,.2f} €")
-    st.dataframe(formatted, use_container_width=True)
-
-    with st.expander("Supprimer un snapshot"):
-        dates_dispo = sorted(df_hist["date"].dt.date.unique(), reverse=True)
-        date_to_delete = st.selectbox(
-            "Choisir la date à supprimer",
-            options=dates_dispo,
-            format_func=lambda d: d.strftime("%d/%m/%Y"),
+        st.subheader("Évolution par catégorie")
+        cat_evo = get_category_evolution(df_hist)
+        fig_cat = go.Figure()
+        for i, col in enumerate(cat_evo.columns):
+            color = CATEGORY_COLORS[i % len(CATEGORY_COLORS)]
+            fig_cat.add_trace(go.Scatter(
+                x=cat_evo.index, y=cat_evo[col],
+                mode="lines+markers", name=col,
+                line=dict(color=color, width=2),
+                marker=dict(size=5, color=color),
+            ))
+        fig_cat.update_layout(
+            **PLOTLY_LAYOUT,
+            yaxis_title="Montant (€)", xaxis_title="Date",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                        bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
         )
-        if st.button("Supprimer ce snapshot", icon=":material/delete:"):
-            df_hist = delete_snapshot(df_hist, date_to_delete)
-            st.toast("Snapshot supprimé")
-            st.rerun()
+        st.plotly_chart(fig_cat, use_container_width=True, config={"staticPlot": True})
+
+        st.subheader("Tableau des snapshots")
+        snap_table = get_snapshot_table(df_hist)
+        formatted = snap_table.copy()
+        for col in formatted.columns:
+            formatted[col] = formatted[col].apply(lambda x: f"{x:,.2f} €")
+        st.dataframe(formatted, use_container_width=True)
+
+        with st.expander("Supprimer un snapshot"):
+            dates_dispo = sorted(df_hist["date"].dt.date.unique(), reverse=True)
+            date_to_delete = st.selectbox(
+                "Choisir la date à supprimer",
+                options=dates_dispo,
+                format_func=lambda d: d.strftime("%d/%m/%Y"),
+            )
+            if st.button("Supprimer ce snapshot", icon=":material/delete:"):
+                df_hist = delete_snapshot(df_hist, date_to_delete)
+                st.toast("Snapshot supprimé")
+                st.rerun()
