@@ -8,11 +8,13 @@ init_storage()
 
 st.title("Suivi de patrimoine")
 
-df = load_assets()
-
 st.subheader("Actifs")
 
-st.dataframe(df, use_container_width=True)
+df = load_assets()
+if df.empty:
+    st.info("Aucun actif enregistré, commencez par en ajouter un.")
+else:
+    st.dataframe(df, use_container_width=True)
 
 st.subheader("Ajouter un actif")
 
