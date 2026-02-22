@@ -8,6 +8,7 @@ from services.assets import (
 from services.historique import (
     init_historique, load_historique, save_snapshot, delete_snapshot,
     get_total_evolution, get_category_evolution, get_snapshot_table,
+    get_last_two_snapshots_totals,
 )
 from constants import CATEGORIES_ASSETS
 
@@ -139,12 +140,30 @@ with tab_actifs:
     st.divider()
 
     total = compute_total(df)
-    st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+    dernier, avant_dernier = get_last_two_snapshots_totals(df_hist)
+
+    if dernier and avant_dernier:
+        delta_total = dernier["total"] - avant_dernier["total"]
+        delta_str = (
+            f"{delta_total:+,.2f} € "
+            f"({avant_dernier['date'].strftime('%d/%m/%Y')} → {dernier['date'].strftime('%d/%m/%Y')})"
+        )
+    else:
+        delta_str = None
+
+    st.metric(label="Patrimoine total", value=f"{total:,.2f} €", delta=delta_str)
 
     stats = compute_by_category(df)
     if not stats.empty:
         st.subheader("Répartition par catégorie")
         display = stats.copy()
+        if dernier and avant_dernier:
+            display["delta"] = display.apply(
+                lambda r: dernier["par_categorie"].get(r["categorie"], 0)
+                        - avant_dernier["par_categorie"].get(r["categorie"], 0),
+                axis=1,
+            )
+            display["delta"] = display["delta"].apply(lambda x: f"{x:+,.2f} €")
         display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
         display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
         st.table(display.set_index("categorie"))

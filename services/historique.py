@@ -88,3 +88,28 @@ def get_snapshot_table(df_hist: pd.DataFrame) -> pd.DataFrame:
     pivot.index = pivot.index.strftime("%d/%m/%Y")
     pivot.index.name = "Date"
     return pivot
+
+
+def get_last_two_snapshots_totals(df_hist: pd.DataFrame) -> tuple:
+    """
+    Retourne les totaux des deux derniers snapshots sous forme de tuple (dernier, avant-dernier).
+    Chaque élément : { "total": float, "par_categorie": { categorie: float }, "date": date }
+    Retourne (dernier, None) s'il n'y a qu'un seul snapshot, (None, None) si vide.
+    """
+    if df_hist.empty:
+        return None, None
+
+    dates = sorted(df_hist["date"].unique(), reverse=True)
+
+    def _build(date):
+        rows = df_hist[df_hist["date"] == date]
+        return {
+            "total": rows["montant"].sum(),
+            "par_categorie": rows.set_index("categorie")["montant"].to_dict(),
+            "date": pd.Timestamp(date),
+        }
+
+    dernier = _build(dates[0])
+    avant_dernier = _build(dates[1]) if len(dates) >= 2 else None
+
+    return dernier, avant_dernier
