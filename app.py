@@ -142,29 +142,21 @@ with tab_actifs:
     stats = compute_by_category(df)
     if not stats.empty:
         st.subheader("Répartition par catégorie")
+        
+        fig_pie = go.Figure(go.Pie(
+            labels=stats["categorie"],
+            values=stats["montant"],
+            marker=dict(colors=CATEGORY_COLORS[:len(stats)]),
+            textinfo="label+percent",
+            textfont=dict(color="#E8EAF0", size=13),
+            hole=0.35,
+        ))
+        fig_pie.update_layout(
+            **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
+            showlegend=False,
+        )
+        st.plotly_chart(fig_pie, use_container_width=True, config={"staticPlot": True})
 
-        col_pie, col_table = st.columns([2, 1])
-
-        with col_pie:
-            fig_pie = go.Figure(go.Pie(
-                labels=stats["categorie"],
-                values=stats["montant"],
-                marker=dict(colors=CATEGORY_COLORS[:len(stats)]),
-                textinfo="label+percent",
-                textfont=dict(color="#E8EAF0", size=13),
-                hole=0.35,
-            ))
-            fig_pie.update_layout(
-                **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
-                showlegend=False,
-            )
-            st.plotly_chart(fig_pie, use_container_width=True, config={"staticPlot": True})
-
-        with col_table:
-            display = stats.copy()
-            display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
-            display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
-            st.table(display.set_index("categorie"))
 
 # ── Tab Historique ────────────────────────────────────────────────────────────
 
