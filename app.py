@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import plotly.graph_objects as go
 from services.storage import init_storage, download_assets
 from services.assets import (
@@ -31,10 +32,11 @@ with st.sidebar:
         nom = st.text_input("Nom")
         categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS)
         montant = st.number_input("Montant", min_value=0.0, step=100.0)
+        notes = st.text_input("Notes", placeholder="ex. MSCI World, ISIN, courtier…")
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
-                df = add_asset(df, nom, categorie, montant)
+                df = add_asset(df, nom, categorie, montant, notes)
                 st.toast("Actif ajouté")
                 st.rerun()
             else:
@@ -79,27 +81,34 @@ with tab_actifs:
     else:
         for idx, row in df.iterrows():
             with st.container(border=True, vertical_alignment="center"):
-                cols = st.columns([3, 2, 2, 1, 1])
+                cols = st.columns([3, 2, 2, 3, 1, 1])
                 cols[0].write(row["nom"])
                 cols[1].write(row["categorie"])
                 cols[2].write(f"{row['montant']:,.2f} €")
-                if cols[3].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
+                notes_val = row.get("notes", "")
+                cols[3].caption(notes_val if pd.notna(notes_val) and notes_val != "" else "—")
+                if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_idx"] = idx
-                if cols[4].button("", key=f"del_{idx}", icon=":material/delete:"):
+                if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
                     st.session_state["deleting_idx"] = idx
 
     if "editing_idx" in st.session_state:
         idx = st.session_state["editing_idx"]
         row = df.loc[idx]
+        notes_current = row.get("notes", "")
+        if pd.isna(notes_current):
+            notes_current = ""
 
         with st.form("edit_asset"):
             nom = st.text_input("Nom", value=row["nom"])
             categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
                                      index=CATEGORIES_ASSETS.index(row["categorie"]))
             montant = st.number_input("Montant", min_value=0.0, value=row["montant"], step=100.0)
+            notes = st.text_input("Notes", value=notes_current,
+                                  placeholder="ex. MSCI World, ISIN, courtier…")
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                df = update_asset(df, idx, nom, categorie, montant)
+                df = update_asset(df, idx, nom, categorie, montant, notes)
                 st.toast("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()
@@ -142,7 +151,7 @@ with tab_actifs:
     stats = compute_by_category(df)
     if not stats.empty:
         st.subheader("Répartition par catégorie")
-        
+
         fig_pie = go.Figure(go.Pie(
             labels=stats["categorie"],
             values=stats["montant"],

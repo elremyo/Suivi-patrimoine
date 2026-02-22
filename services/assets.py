@@ -6,15 +6,18 @@ def get_assets() -> pd.DataFrame:
     return load_assets()
 
 
-def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float) -> pd.DataFrame:
-    new_row = pd.DataFrame([[nom, categorie, montant]], columns=df.columns)
+def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float, notes: str = "") -> pd.DataFrame:
+    new_row = pd.DataFrame([[nom, categorie, montant, notes]], columns=df.columns)
     df = pd.concat([df, new_row], ignore_index=True)
     save_assets(df)
     return df
 
 
-def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: float) -> pd.DataFrame:
-    df.loc[idx] = [nom, categorie, montant]
+def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: float, notes: str = "") -> pd.DataFrame:
+    df.loc[idx, "nom"] = nom
+    df.loc[idx, "categorie"] = categorie
+    df.loc[idx, "montant"] = montant
+    df.loc[idx, "notes"] = notes
     save_assets(df)
     return df
 

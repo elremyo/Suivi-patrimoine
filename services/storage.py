@@ -4,7 +4,7 @@ from pandas.errors import EmptyDataError
 
 DATA_PATH = "data/patrimoine.csv"
 
-COLUMNS = ["nom", "categorie", "montant"]
+COLUMNS = ["nom", "categorie", "montant", "notes"]
 
 
 def init_storage():
@@ -17,12 +17,13 @@ def init_storage():
 def load_assets():
     try:
         df = pd.read_csv(DATA_PATH)
-        if df.empty and list(df.columns) != COLUMNS:
-            # fichier corrompu ou mal initialisé
+        if df.empty and list(df.columns) not in [COLUMNS, COLUMNS[:3]]:
             df = pd.DataFrame(columns=COLUMNS)
+        # Migration : anciens fichiers sans colonne notes
+        if "notes" not in df.columns:
+            df["notes"] = ""
         return df
     except (EmptyDataError, FileNotFoundError):
-        # fichier vide ou inexistant
         df = pd.DataFrame(columns=COLUMNS)
         df.to_csv(DATA_PATH, index=False)
         return df
