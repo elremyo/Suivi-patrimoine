@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from services.storage import init_storage, load_assets, save_assets
+from services.storage import init_storage, load_assets, save_assets, download_assets
 from constants import CATEGORIES_ASSETS
 
 
@@ -77,6 +77,10 @@ with st.expander("Ajouter un nouvel actif"):
             save_assets(df)
             st.toast("Actif ajouté")
             st.rerun()
+
+st.subheader("Exporter les données")
+if st.download_button("Télécharger le patrimoine", data=download_assets(df), file_name="patrimoine.csv", mime="text/csv", icon=":material/download:"):
+    st.toast("Fichier téléchargé")
 
 
 total_patrimoine = df["montant"].sum()

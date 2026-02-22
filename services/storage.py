@@ -30,3 +30,7 @@ def load_assets():
 
 def save_assets(df):
     df.to_csv(DATA_PATH, index=False)
+
+
+def download_assets(df):
+    return df.to_csv(index=False).encode("utf-8")
