@@ -162,13 +162,6 @@ with tab_actifs:
 
         with col_table:
             display = stats.copy()
-            if dernier and avant_dernier:
-                display["delta"] = display.apply(
-                    lambda r: dernier["par_categorie"].get(r["categorie"], 0)
-                            - avant_dernier["par_categorie"].get(r["categorie"], 0),
-                    axis=1,
-                )
-                display["delta"] = display["delta"].apply(lambda x: f"{x:+,.2f} €")
             display["montant"] = display["montant"].apply(lambda x: f"{x:,.2f} €")
             display["pourcentage"] = display["pourcentage"].apply(lambda x: f"{x:.1f} %")
             st.table(display.set_index("categorie"))
