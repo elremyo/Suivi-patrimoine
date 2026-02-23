@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from services.storage import init_storage, download_assets
+from services.storage import init_storage, download_assets, save_assets
 from services.assets import (
     get_assets, add_asset, update_asset, delete_asset,
     compute_total, compute_by_category,
@@ -11,7 +11,8 @@ from services.historique import (
     get_total_evolution, get_category_evolution, get_snapshot_table,
     get_last_two_snapshots_totals,
 )
-from constants import CATEGORIES_ASSETS, CATEGORY_COLORS, PLOTLY_LAYOUT
+from services.pricer import refresh_auto_assets
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT
 
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
@@ -28,19 +29,53 @@ with st.sidebar:
     st.divider()
 
     st.subheader("Ajouter un actif")
+
+    categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS, key="add_categorie")
+    is_auto = categorie in CATEGORIES_AUTO
+
     with st.form("add_asset", clear_on_submit=True):
         nom = st.text_input("Nom")
-        categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS)
-        montant = st.number_input("Montant", min_value=0.0, step=100.0)
-        ticker = st.text_input("Ticker", placeholder="ex. WPEA, IMMO, BTC…")
+        notes = st.text_input("Notes", placeholder="ex. MSCI World, ISIN, courtier…")
+
+        if is_auto:
+            ticker = st.text_input("Ticker", placeholder="ex. AAPL, BTC-USD, CW8.PA")
+            quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
+            montant = st.number_input("Montant actuel (€)", min_value=0.0, step=100.0,
+                                      help="Sera mis à jour automatiquement via yfinance.")
+        else:
+            ticker = ""
+            quantite = 0.0
+            montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
-                df = add_asset(df, nom, categorie, montant, ticker)
+                df = add_asset(df, nom, categorie, montant, notes, ticker, quantite)
                 st.toast("Actif ajouté")
                 st.rerun()
             else:
                 st.warning("Le nom est obligatoire.")
+
+    st.divider()
+
+    st.subheader("Prix")
+
+    has_auto_assets = (
+        not df.empty
+        and df["categorie"].isin(CATEGORIES_AUTO).any()
+        and df["ticker"].notna().any()
+        and (df["ticker"] != "").any()
+    )
+
+    if st.button("🔄 Actualiser les prix", disabled=not has_auto_assets,
+                 use_container_width=True):
+        with st.spinner("Récupération des prix…"):
+            df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+            save_assets(df)
+        if errors:
+            st.warning(f"Tickers introuvables : {', '.join(errors)}")
+        else:
+            st.toast("Prix mis à jour")
+        st.rerun()
 
     st.divider()
 
@@ -85,8 +120,8 @@ with tab_actifs:
                 cols[0].write(row["nom"])
                 cols[1].write(row["categorie"])
                 cols[2].write(f"{row['montant']:,.2f} €")
-                ticker_val = row.get("ticker", "")
-                cols[3].caption(ticker_val if pd.notna(ticker_val) and ticker_val != "" else "—")
+                notes_val = row.get("notes", "")
+                cols[3].caption(notes_val if pd.notna(notes_val) and notes_val != "" else "—")
                 if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_idx"] = idx
                 if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
@@ -95,20 +130,41 @@ with tab_actifs:
     if "editing_idx" in st.session_state:
         idx = st.session_state["editing_idx"]
         row = df.loc[idx]
+        notes_current = row.get("notes", "")
+        if pd.isna(notes_current):
+            notes_current = ""
         ticker_current = row.get("ticker", "")
         if pd.isna(ticker_current):
             ticker_current = ""
+        quantite_current = row.get("quantite", 0.0)
+        if pd.isna(quantite_current):
+            quantite_current = 0.0
+
+        is_auto_edit = row["categorie"] in CATEGORIES_AUTO
 
         with st.form("edit_asset"):
             nom = st.text_input("Nom", value=row["nom"])
-            categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
-                                     index=CATEGORIES_ASSETS.index(row["categorie"]))
-            montant = st.number_input("Montant", min_value=0.0, value=row["montant"], step=100.0)
-            ticker = st.text_input("Ticker", value=ticker_current,
-                                   placeholder="ex. WPEA, IMMO, BTC…")
+            categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
+                                          index=CATEGORIES_ASSETS.index(row["categorie"]))
+            notes = st.text_input("Notes", value=notes_current,
+                                  placeholder="ex. MSCI World, ISIN, courtier…")
+
+            if is_auto_edit:
+                ticker = st.text_input("Ticker", value=ticker_current,
+                                       placeholder="ex. AAPL, BTC-USD, CW8.PA")
+                quantite = st.number_input("Quantité", min_value=0.0,
+                                           value=float(quantite_current), step=1.0, format="%g")
+                montant = st.number_input("Montant actuel (€)", min_value=0.0,
+                                          value=float(row["montant"]), step=100.0)
+            else:
+                ticker = ""
+                quantite = 0.0
+                montant = st.number_input("Montant (€)", min_value=0.0,
+                                          value=float(row["montant"]), step=100.0)
+
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                df = update_asset(df, idx, nom, categorie, montant, ticker)
+                df = update_asset(df, idx, nom, categorie_edit, montant, notes, ticker, quantite)
                 st.toast("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()

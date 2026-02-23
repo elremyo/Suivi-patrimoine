@@ -1,0 +1,70 @@
+import yfinance as yf
+import pandas as pd
+
+
+def get_price(ticker: str) -> float | None:
+    """
+    Retourne le dernier prix connu pour un ticker yfinance.
+    Retourne None si le ticker est invalide ou introuvable.
+    """
+    try:
+        data = yf.Ticker(ticker)
+        info = data.fast_info
+        price = info.last_price
+        if price and price > 0:
+            return round(price, 4)
+        return None
+    except Exception:
+        return None
+
+
+def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
+    """
+    Retourne un dict { ticker: prix } pour une liste de tickers.
+    Plus efficace que d'appeler get_price() en boucle.
+    """
+    if not tickers:
+        return {}
+
+    results = {}
+    try:
+        data = yf.download(tickers, period="1d", progress=False, auto_adjust=True)
+        close = data["Close"]
+        if isinstance(close, pd.Series):
+            # Un seul ticker retourné comme Series
+            close = close.to_frame(name=tickers[0])
+        for ticker in tickers:
+            if ticker in close.columns and not close[ticker].dropna().empty:
+                results[ticker] = round(float(close[ticker].dropna().iloc[-1]), 4)
+            else:
+                results[ticker] = None
+    except Exception:
+        for ticker in tickers:
+            results[ticker] = None
+
+    return results
+
+
+def refresh_auto_assets(df: pd.DataFrame, categories_auto: set) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Met à jour le montant des actifs automatiques (ticker + quantité).
+    Retourne le DataFrame mis à jour et la liste des tickers en erreur.
+    """
+    mask = df["categorie"].isin(categories_auto) & df["ticker"].notna() & (df["ticker"] != "")
+    auto_df = df[mask]
+
+    if auto_df.empty:
+        return df, []
+
+    tickers = auto_df["ticker"].unique().tolist()
+    prices = get_prices_bulk(tickers)
+
+    errors = []
+    for idx, row in auto_df.iterrows():
+        price = prices.get(row["ticker"])
+        if price is not None:
+            df.loc[idx, "montant"] = round(price * row["quantite"], 2)
+        else:
+            errors.append(row["ticker"])
+
+    return df, errors
