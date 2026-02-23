@@ -32,11 +32,11 @@ with st.sidebar:
         nom = st.text_input("Nom")
         categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS)
         montant = st.number_input("Montant", min_value=0.0, step=100.0)
-        notes = st.text_input("Notes", placeholder="ex. MSCI World, ISIN, courtier…")
+        ticker = st.text_input("Ticker", placeholder="ex. WPEA, IMMO, BTC…")
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
-                df = add_asset(df, nom, categorie, montant, notes)
+                df = add_asset(df, nom, categorie, montant, ticker)
                 st.toast("Actif ajouté")
                 st.rerun()
             else:
@@ -85,8 +85,8 @@ with tab_actifs:
                 cols[0].write(row["nom"])
                 cols[1].write(row["categorie"])
                 cols[2].write(f"{row['montant']:,.2f} €")
-                notes_val = row.get("notes", "")
-                cols[3].caption(notes_val if pd.notna(notes_val) and notes_val != "" else "—")
+                ticker_val = row.get("ticker", "")
+                cols[3].caption(ticker_val if pd.notna(ticker_val) and ticker_val != "" else "—")
                 if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_idx"] = idx
                 if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
@@ -95,20 +95,20 @@ with tab_actifs:
     if "editing_idx" in st.session_state:
         idx = st.session_state["editing_idx"]
         row = df.loc[idx]
-        notes_current = row.get("notes", "")
-        if pd.isna(notes_current):
-            notes_current = ""
+        ticker_current = row.get("ticker", "")
+        if pd.isna(ticker_current):
+            ticker_current = ""
 
         with st.form("edit_asset"):
             nom = st.text_input("Nom", value=row["nom"])
             categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
                                      index=CATEGORIES_ASSETS.index(row["categorie"]))
             montant = st.number_input("Montant", min_value=0.0, value=row["montant"], step=100.0)
-            notes = st.text_input("Notes", value=notes_current,
-                                  placeholder="ex. MSCI World, ISIN, courtier…")
+            ticker = st.text_input("Ticker", value=ticker_current,
+                                   placeholder="ex. WPEA, IMMO, BTC…")
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                df = update_asset(df, idx, nom, categorie, montant, notes)
+                df = update_asset(df, idx, nom, categorie, montant, ticker)
                 st.toast("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()
