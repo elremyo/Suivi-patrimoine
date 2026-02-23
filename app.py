@@ -22,6 +22,26 @@ init_historique()
 df = get_assets()
 df_hist = load_historique()
 
+
+def flash(msg: str, type: str = "success"):
+    """Stocke un message à afficher après le prochain rerun."""
+    st.session_state["_flash"] = {"msg": msg, "type": type}
+
+
+def show_flash():
+    """Affiche et consomme le message flash s'il existe."""
+    if "_flash" in st.session_state:
+        f = st.session_state.pop("_flash")
+        if f["type"] == "success":
+            st.toast(f["msg"], icon="✅")
+        elif f["type"] == "warning":
+            st.toast(f["msg"], icon="⚠️")
+        elif f["type"] == "error":
+            st.toast(f["msg"], icon="❌")
+        elif f["type"] == "info":
+            st.toast(f["msg"], icon="ℹ️")
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -50,10 +70,12 @@ with st.sidebar:
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
                 df = add_asset(df, nom, categorie, montant, notes, ticker, quantite)
-                st.toast("Actif ajouté")
+                flash("Actif ajouté")
                 st.rerun()
             else:
                 st.warning("Le nom est obligatoire.")
+
+    show_flash()
 
     st.divider()
 
@@ -72,19 +94,23 @@ with st.sidebar:
             df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
             save_assets(df)
         if errors:
-            st.warning(f"Tickers introuvables : {', '.join(errors)}")
+            flash(f"Tickers introuvables : {', '.join(errors)}", type="warning")
         else:
-            st.toast("Prix mis à jour")
+            flash("Prix mis à jour")
         st.rerun()
+
+    show_flash()
 
     st.divider()
 
     st.subheader("Historique")
     if st.button("📸 Enregistrer un snapshot", disabled=df.empty, use_container_width=True, type="primary"):
         if save_snapshot(df):
-            st.toast("Snapshot enregistré")
+            flash("Snapshot enregistré")
             st.rerun()
     st.caption("Un seul snapshot par jour — le dernier écrase le précédent.")
+
+    show_flash()
 
     st.divider()
 
@@ -97,7 +123,7 @@ with st.sidebar:
         icon=":material/download:",
         use_container_width=True,
     ):
-        st.toast("Fichier téléchargé")
+        pass  # Le téléchargement ne nécessite pas de rerun
 
 # ── Page principale ───────────────────────────────────────────────────────────
 
@@ -108,6 +134,8 @@ tab_actifs, tab_historique = st.tabs(["📋 Actifs", "📈 Historique"])
 # ── Tab Actifs ────────────────────────────────────────────────────────────────
 
 with tab_actifs:
+
+    show_flash()
 
     st.subheader("Actifs")
 
@@ -165,7 +193,7 @@ with tab_actifs:
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
                 df = update_asset(df, idx, nom, categorie_edit, montant, notes, ticker, quantite)
-                st.toast("Actif modifié")
+                flash("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()
             if c2.form_submit_button("Annuler", use_container_width=True):
@@ -181,7 +209,7 @@ with tab_actifs:
             c1, c2 = st.columns(2)
             if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
                 df = delete_asset(df, idx)
-                st.toast("Actif supprimé")
+                flash("Actif supprimé")
                 del st.session_state["deleting_idx"]
                 st.rerun()
             if c2.button("Annuler", key=f"cancel_del_{idx}", use_container_width=True):
@@ -269,6 +297,7 @@ with tab_historique:
         st.dataframe(formatted, use_container_width=True)
 
         with st.expander("Supprimer un snapshot"):
+            show_flash()
             dates_dispo = sorted(df_hist["date"].dt.date.unique(), reverse=True)
             date_to_delete = st.selectbox(
                 "Choisir la date à supprimer",
@@ -277,5 +306,5 @@ with tab_historique:
             )
             if st.button("Supprimer ce snapshot", icon=":material/delete:"):
                 df_hist = delete_snapshot(df_hist, date_to_delete)
-                st.toast("Snapshot supprimé")
+                flash("Snapshot supprimé")
                 st.rerun()
