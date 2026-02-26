@@ -1,3 +1,4 @@
+import uuid
 import pandas as pd
 from services.storage import load_assets, save_assets
 
@@ -11,8 +12,9 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
     # Pour les actifs auto, le montant initial = PRU × quantité en attendant le premier refresh
     if ticker and quantite > 0 and pru > 0:
         montant = round(pru * quantite, 2)
+    asset_id = str(uuid.uuid4())
     new_row = pd.DataFrame(
-        [[nom, categorie, montant, ticker, quantite, pru]],
+        [[asset_id, nom, categorie, montant, ticker, quantite, pru]],
         columns=df.columns
     )
     df = pd.concat([df, new_row], ignore_index=True)

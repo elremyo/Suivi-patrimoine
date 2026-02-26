@@ -1,10 +1,11 @@
 import os
+import uuid
 import pandas as pd
 from pandas.errors import EmptyDataError
 
 DATA_PATH = "data/patrimoine.csv"
 
-COLUMNS = ["nom", "categorie", "montant", "ticker", "quantite", "pru"]
+COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru"]
 
 
 def init_storage():
@@ -19,6 +20,17 @@ def load_assets():
         df = pd.read_csv(DATA_PATH)
         if df.empty and list(df.columns) not in [COLUMNS]:
             df = pd.DataFrame(columns=COLUMNS)
+        # Migration : anciens fichiers sans les nouvelles colonnes
+        if "notes" in df.columns:
+            df = df.drop(columns=["notes"])
+        if "id" not in df.columns:
+            df.insert(0, "id", [str(uuid.uuid4()) for _ in range(len(df))])
+        if "ticker" not in df.columns:
+            df["ticker"] = ""
+        if "quantite" not in df.columns:
+            df["quantite"] = 0.0
+        if "pru" not in df.columns:
+            df["pru"] = 0.0
         return df
     except (EmptyDataError, FileNotFoundError):
         df = pd.DataFrame(columns=COLUMNS)
