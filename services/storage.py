@@ -2,8 +2,7 @@ import os
 import uuid
 import pandas as pd
 from pandas.errors import EmptyDataError
-
-DATA_PATH = "data/patrimoine.csv"
+from constants import DATA_PATH
 
 COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru"]
 

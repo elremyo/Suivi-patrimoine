@@ -12,7 +12,7 @@ from services.historique import (
 )
 from services.positions import init_positions, load_positions, record_position, delete_asset_positions
 from services.pricer import refresh_auto_assets, get_name, fetch_historical_prices
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
 
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
@@ -301,16 +301,6 @@ with tab_actifs:
 
 # ── Tab Historique ────────────────────────────────────────────────────────────
 
-# Mapping période label → (yfinance period, nb jours pour filtre, None = pas de filtre)
-PERIOD_OPTIONS = {
-    "1S":  ("5d",   7),
-    "1M":  ("1mo",  30),
-    "3M":  ("3mo",  90),
-    "6M":  ("6mo",  180),
-    "1A":  ("1y",   365),
-    "Max": ("max",  None),
-}
-
 with tab_historique:
 
     auto_tickers = sorted(
@@ -327,7 +317,7 @@ with tab_historique:
         period_label = st.segmented_control(
             "Période",
             options=list(PERIOD_OPTIONS.keys()),
-            default="3M",
+            default=PERIOD_DEFAULT,
             key="period_selector",
         )
         yf_period, nb_jours = PERIOD_OPTIONS[period_label]

@@ -2,8 +2,8 @@ import os
 import pandas as pd
 from datetime import date
 from pandas.errors import EmptyDataError
+from constants import POSITIONS_PATH
 
-POSITIONS_PATH = "data/positions.csv"
 COLUMNS = ["asset_id", "date", "quantite"]
 
 

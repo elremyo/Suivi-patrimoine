@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import streamlit as st
+from constants import CACHE_TTL_SECONDS, PERIOD_OPTIONS, PERIOD_DEFAULT
 
 
 def get_price(ticker: str) -> float | None:
@@ -56,8 +57,8 @@ def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
     return results
 
 
-@st.cache_data(ttl=3 * 3600, show_spinner=False)
-def fetch_historical_prices(tickers: tuple, period: str = "3mo") -> pd.DataFrame:
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
+def fetch_historical_prices(tickers: tuple, period: str = PERIOD_OPTIONS[PERIOD_DEFAULT][0]) -> pd.DataFrame:
     """
     Récupère les prix de clôture historiques pour une liste de tickers.
     Retourne un DataFrame pivot date × ticker.
@@ -66,8 +67,6 @@ def fetch_historical_prices(tickers: tuple, period: str = "3mo") -> pd.DataFrame
     Accepte un tuple (hashable) pour que @st.cache_data puisse construire la clé de cache.
     Le cache est séparé par combinaison (tickers, period).
     """
-    print(f"[FETCH yfinance] tickers={tickers} / period={period}")  # ← BEBUG
-
     if not tickers:
         return pd.DataFrame()
     tickers_list = list(tickers)

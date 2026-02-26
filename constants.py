@@ -16,8 +16,6 @@ CATEGORY_COLORS = [
     "#4C9BE8", "#36C28A", "#F5A623", "#E8547A", "#A78BFA",
 ]
 
-
-
 PLOTLY_LAYOUT = dict(
     paper_bgcolor="#1A1D27",
     plot_bgcolor="#1A1D27",
@@ -28,3 +26,26 @@ PLOTLY_LAYOUT = dict(
     hovermode=False,
 )
 
+# ── Chemins des fichiers de données ──────────────────────────────────────────
+
+DATA_PATH       = "data/patrimoine.csv"
+HISTORIQUE_PATH = "data/historique.csv"
+POSITIONS_PATH  = "data/positions.csv"
+
+# ── Cache yfinance ────────────────────────────────────────────────────────────
+
+CACHE_TTL_SECONDS = 3 * 3600  # 3 heures
+
+# ── Périodes disponibles dans le tab Historique ───────────────────────────────
+# Format : label → (période yfinance, nb jours de filtre — None = pas de filtre)
+
+PERIOD_OPTIONS = {
+    "1S":  ("5d",  7),
+    "1M":  ("1mo", 30),
+    "3M":  ("3mo", 90),
+    "6M":  ("6mo", 180),
+    "1A":  ("1y",  365),
+    "Max": ("max", None),
+}
+
+PERIOD_DEFAULT = "6M"

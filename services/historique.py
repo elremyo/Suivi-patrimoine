@@ -2,8 +2,8 @@ import os
 import pandas as pd
 from datetime import date
 from pandas.errors import EmptyDataError
+from constants import HISTORIQUE_PATH
 
-HISTORIQUE_PATH = "data/historique.csv"
 COLUMNS = ["asset_id", "date", "montant"]
 
 
@@ -85,7 +85,6 @@ def build_total_evolution(
     if all_dates.empty:
         return pd.DataFrame(columns=["date", "total"])
 
-    # Ne reconstruire qu'à partir de la première date où on a des données réelles
     earliest = _earliest_known_date(df_hist, df_positions)
     if earliest is not None:
         all_dates = all_dates[all_dates >= earliest]
@@ -102,7 +101,6 @@ def build_total_evolution(
             if val is not None:
                 total += val
                 has_value = True
-        # N'ajoute le point que si au moins un actif a contribué une valeur
         if has_value:
             records.append({"date": d, "total": total})
 
