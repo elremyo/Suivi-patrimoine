@@ -155,7 +155,12 @@ with tab_actifs:
             with st.container(border=True, vertical_alignment="center"):
                 is_auto_row = row["categorie"] in CATEGORIES_AUTO
                 cols = st.columns([4, 2, 2, 2, 1, 1])
-                cols[0].write(row["nom"])
+
+                if is_auto_row and row.get("ticker"):
+                    cols[0].write(row["nom"])
+                    cols[0].caption(f'{row["ticker"]} · {row["quantite"]:g} unités')
+                else:
+                    cols[0].write(row["nom"])
                 cols[1].write(row["categorie"])
                 cols[2].write(f"{row['montant']:,.2f} €")
 
@@ -222,7 +227,6 @@ with tab_actifs:
                     st.warning("Le nom est obligatoire.")
                 else:
                     if is_auto_edit:
-                        # Si le ticker a changé, on récupère le nouveau nom
                         new_nom = get_name(ticker) if ticker != ticker_current else row["nom"]
                         with st.spinner("Synchronisation du prix…"):
                             df = update_asset(df, idx, new_nom, categorie_edit, montant, ticker, quantite, pru)
