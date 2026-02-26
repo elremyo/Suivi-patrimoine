@@ -7,9 +7,12 @@ def get_assets() -> pd.DataFrame:
 
 
 def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
-              ticker: str = "", quantite: float = 0.0) -> pd.DataFrame:
+              ticker: str = "", quantite: float = 0.0, pru: float = 0.0) -> pd.DataFrame:
+    # Pour les actifs auto, le montant initial = PRU × quantité en attendant le premier refresh
+    if ticker and quantite > 0 and pru > 0:
+        montant = round(pru * quantite, 2)
     new_row = pd.DataFrame(
-        [[nom, categorie, montant, ticker, quantite]],
+        [[nom, categorie, montant, ticker, quantite, pru]],
         columns=df.columns
     )
     df = pd.concat([df, new_row], ignore_index=True)
@@ -18,12 +21,13 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
 
 
 def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: float,
-                 ticker: str = "", quantite: float = 0.0) -> pd.DataFrame:
+                 ticker: str = "", quantite: float = 0.0, pru: float = 0.0) -> pd.DataFrame:
     df.loc[idx, "nom"] = nom
     df.loc[idx, "categorie"] = categorie
     df.loc[idx, "montant"] = montant
     df.loc[idx, "ticker"] = ticker
     df.loc[idx, "quantite"] = quantite
+    df.loc[idx, "pru"] = pru
     save_assets(df)
     return df
 

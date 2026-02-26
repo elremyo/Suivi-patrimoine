@@ -59,16 +59,18 @@ with st.sidebar:
         if is_auto:
             ticker = st.text_input("Ticker", placeholder="ex. AAPL, BTC-USD, CW8.PA")
             quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
-            montant = st.number_input("Montant actuel (€)", min_value=0.0, step=100.0,
-                                      help="Sera mis à jour automatiquement via yfinance.")
+            pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
+                                  help="Prix de Revient Unitaire. Le montant actuel sera calculé via yfinance.")
+            montant = 0.0
         else:
             ticker = ""
             quantite = 0.0
+            pru = 0.0
             montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
-                df = add_asset(df, nom, categorie, montant, ticker, quantite)
+                df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
                 flash("Actif ajouté")
                 st.rerun()
             else:
@@ -143,13 +145,28 @@ with tab_actifs:
     else:
         for idx, row in df.iterrows():
             with st.container(border=True, vertical_alignment="center"):
-                cols = st.columns([4, 2, 2, 1, 1])
+                is_auto_row = row["categorie"] in CATEGORIES_AUTO
+                cols = st.columns([4, 2, 2, 2, 1, 1])
                 cols[0].write(row["nom"])
                 cols[1].write(row["categorie"])
                 cols[2].write(f"{row['montant']:,.2f} €")
-                if cols[3].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
+
+                if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
+                    valeur_achat = row["pru"] * row["quantite"]
+                    pnl = row["montant"] - valeur_achat
+                    pnl_pct = (pnl / valeur_achat * 100) if valeur_achat else 0
+                    color = "#36C28A" if pnl >= 0 else "#E8547A"
+                    sign = "+" if pnl >= 0 else ""
+                    cols[3].markdown(
+                        f"<span style='color:{color}'>{sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)</span>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    cols[3].write("")
+
+                if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_idx"] = idx
-                if cols[4].button("", key=f"del_{idx}", icon=":material/delete:"):
+                if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
                     st.session_state["deleting_idx"] = idx
 
     if "editing_idx" in st.session_state:
@@ -161,6 +178,9 @@ with tab_actifs:
         quantite_current = row.get("quantite", 0.0)
         if pd.isna(quantite_current):
             quantite_current = 0.0
+        pru_current = row.get("pru", 0.0)
+        if pd.isna(pru_current):
+            pru_current = 0.0
 
         is_auto_edit = row["categorie"] in CATEGORIES_AUTO
 
@@ -174,17 +194,19 @@ with tab_actifs:
                                        placeholder="ex. AAPL, BTC-USD, CW8.PA")
                 quantite = st.number_input("Quantité", min_value=0.0,
                                            value=float(quantite_current), step=1.0, format="%g")
-                montant = st.number_input("Montant actuel (€)", min_value=0.0,
-                                          value=float(row["montant"]), step=100.0)
+                pru = st.number_input("PRU (€)", min_value=0.0,
+                                      value=float(pru_current), step=1.0, format="%g")
+                montant = float(row["montant"])
             else:
                 ticker = ""
                 quantite = 0.0
+                pru = 0.0
                 montant = st.number_input("Montant (€)", min_value=0.0,
                                           value=float(row["montant"]), step=100.0)
 
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite)
+                df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
                 flash("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()
