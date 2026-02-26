@@ -18,6 +18,17 @@ def get_price(ticker: str) -> float | None:
         return None
 
 
+def get_name(ticker: str) -> str:
+    """
+    Retourne le nom complet d'un ticker (longName).
+    Fallback sur le ticker lui-même si introuvable.
+    """
+    try:
+        info = yf.Ticker(ticker).info
+        return info.get("longName") or info.get("shortName") or ticker
+    except Exception:
+        return ticker
+    
 def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
     """
     Retourne un dict { ticker: prix } pour une liste de tickers.

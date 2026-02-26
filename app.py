@@ -11,7 +11,7 @@ from services.historique import (
     get_total_evolution, get_category_evolution, get_snapshot_table,
     get_last_two_snapshots_totals,
 )
-from services.pricer import refresh_auto_assets
+from services.pricer import refresh_auto_assets, get_name
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT
 
 
@@ -54,35 +54,40 @@ with st.sidebar:
     is_auto = categorie in CATEGORIES_AUTO
 
     with st.form("add_asset", clear_on_submit=True):
-        nom = st.text_input("Nom")
-
         if is_auto:
-            ticker = st.text_input("Ticker", placeholder="ex. AAPL, BTC-USD, CW8.PA")
+            ticker = st.text_input("Ticker *", placeholder="ex. AAPL, BTC-USD, CW8.PA")
             quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
             pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
-                                  help="Prix de Revient Unitaire. Le montant actuel sera calculé via yfinance.")
+                                  help="Prix de Revient Unitaire.")
+            nom = ""
             montant = 0.0
         else:
+            nom = st.text_input("Nom *")
             ticker = ""
             quantite = 0.0
             pru = 0.0
             montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
-            if nom:
-                df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
-                if ticker:
-                    df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-                    save_assets(df)
+            if is_auto and not ticker:
+                st.warning("Le ticker est obligatoire.")
+            elif not is_auto and not nom:
+                st.warning("Le nom est obligatoire.")
+            else:
+                if is_auto:
+                    with st.spinner("Récupération du nom et du prix…"):
+                        nom = get_name(ticker)
+                        df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
+                        df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+                        save_assets(df)
                     if errors:
-                        flash(f"Actif ajouté, mais ticker introuvable : {', '.join(errors)}", type="warning")
+                        flash(f"Actif ajouté ({nom}), mais ticker introuvable : {', '.join(errors)}", type="warning")
                     else:
-                        flash("Actif ajouté et prix synchronisé")
+                        flash(f"Actif ajouté et prix synchronisé ({nom})")
                 else:
+                    df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
                     flash("Actif ajouté")
                 st.rerun()
-            else:
-                st.warning("Le nom est obligatoire.")
 
     show_flash()
 
@@ -193,12 +198,10 @@ with tab_actifs:
         is_auto_edit = row["categorie"] in CATEGORIES_AUTO
 
         with st.form("edit_asset"):
-            nom = st.text_input("Nom", value=row["nom"])
-            categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
-                                          index=CATEGORIES_ASSETS.index(row["categorie"]))
-
             if is_auto_edit:
-                ticker = st.text_input("Ticker", value=ticker_current,
+                st.text_input("Nom", value=row["nom"], disabled=True,
+                              help="Nom récupéré automatiquement depuis yfinance.")
+                ticker = st.text_input("Ticker *", value=ticker_current,
                                        placeholder="ex. AAPL, BTC-USD, CW8.PA")
                 quantite = st.number_input("Quantité", min_value=0.0,
                                            value=float(quantite_current), step=1.0, format="%g")
@@ -206,26 +209,38 @@ with tab_actifs:
                                       value=float(pru_current), step=1.0, format="%g")
                 montant = float(row["montant"])
             else:
+                nom = st.text_input("Nom *", value=row["nom"])
                 ticker = ""
                 quantite = 0.0
                 pru = 0.0
                 montant = st.number_input("Montant (€)", min_value=0.0,
                                           value=float(row["montant"]), step=100.0)
+            categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
+                                          index=CATEGORIES_ASSETS.index(row["categorie"]))
 
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
-                if ticker:
-                    df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-                    save_assets(df)
-                    if errors:
-                        flash(f"Actif modifié, mais ticker introuvable : {', '.join(errors)}", type="warning")
-                    else:
-                        flash("Actif modifié et prix synchronisé")
+                if is_auto_edit and not ticker:
+                    st.warning("Le ticker est obligatoire.")
+                elif not is_auto_edit and not nom:
+                    st.warning("Le nom est obligatoire.")
                 else:
-                    flash("Actif modifié")
-                del st.session_state["editing_idx"]
-                st.rerun()
+                    if is_auto_edit:
+                        # Si le ticker a changé, on récupère le nouveau nom
+                        new_nom = get_name(ticker) if ticker != ticker_current else row["nom"]
+                        with st.spinner("Synchronisation du prix…"):
+                            df = update_asset(df, idx, new_nom, categorie_edit, montant, ticker, quantite, pru)
+                            df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+                            save_assets(df)
+                        if errors:
+                            flash(f"Actif modifié, mais ticker introuvable : {', '.join(errors)}", type="warning")
+                        else:
+                            flash("Actif modifié et prix synchronisé")
+                    else:
+                        df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
+                        flash("Actif modifié")
+                    del st.session_state["editing_idx"]
+                    st.rerun()
             if c2.form_submit_button("Annuler", use_container_width=True):
                 del st.session_state["editing_idx"]
                 st.rerun()
