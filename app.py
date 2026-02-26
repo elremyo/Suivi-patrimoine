@@ -55,7 +55,6 @@ with st.sidebar:
 
     with st.form("add_asset", clear_on_submit=True):
         nom = st.text_input("Nom")
-        notes = st.text_input("Notes", placeholder="ex. MSCI World, ISIN, courtier…")
 
         if is_auto:
             ticker = st.text_input("Ticker", placeholder="ex. AAPL, BTC-USD, CW8.PA")
@@ -69,7 +68,7 @@ with st.sidebar:
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
-                df = add_asset(df, nom, categorie, montant, notes, ticker, quantite)
+                df = add_asset(df, nom, categorie, montant, ticker, quantite)
                 flash("Actif ajouté")
                 st.rerun()
             else:
@@ -144,23 +143,18 @@ with tab_actifs:
     else:
         for idx, row in df.iterrows():
             with st.container(border=True, vertical_alignment="center"):
-                cols = st.columns([3, 2, 2, 3, 1, 1])
+                cols = st.columns([4, 2, 2, 1, 1])
                 cols[0].write(row["nom"])
                 cols[1].write(row["categorie"])
                 cols[2].write(f"{row['montant']:,.2f} €")
-                notes_val = row.get("notes", "")
-                cols[3].caption(notes_val if pd.notna(notes_val) and notes_val != "" else "—")
-                if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
+                if cols[3].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_idx"] = idx
-                if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
+                if cols[4].button("", key=f"del_{idx}", icon=":material/delete:"):
                     st.session_state["deleting_idx"] = idx
 
     if "editing_idx" in st.session_state:
         idx = st.session_state["editing_idx"]
         row = df.loc[idx]
-        notes_current = row.get("notes", "")
-        if pd.isna(notes_current):
-            notes_current = ""
         ticker_current = row.get("ticker", "")
         if pd.isna(ticker_current):
             ticker_current = ""
@@ -174,8 +168,6 @@ with tab_actifs:
             nom = st.text_input("Nom", value=row["nom"])
             categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
                                           index=CATEGORIES_ASSETS.index(row["categorie"]))
-            notes = st.text_input("Notes", value=notes_current,
-                                  placeholder="ex. MSCI World, ISIN, courtier…")
 
             if is_auto_edit:
                 ticker = st.text_input("Ticker", value=ticker_current,
@@ -192,7 +184,7 @@ with tab_actifs:
 
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                df = update_asset(df, idx, nom, categorie_edit, montant, notes, ticker, quantite)
+                df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite)
                 flash("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()

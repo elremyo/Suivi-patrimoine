@@ -4,7 +4,7 @@ from pandas.errors import EmptyDataError
 
 DATA_PATH = "data/patrimoine.csv"
 
-COLUMNS = ["nom", "categorie", "montant", "notes", "ticker", "quantite"]
+COLUMNS = ["nom", "categorie", "montant", "ticker", "quantite"]
 
 
 def init_storage():

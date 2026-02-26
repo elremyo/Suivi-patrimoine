@@ -7,9 +7,9 @@ def get_assets() -> pd.DataFrame:
 
 
 def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
-              notes: str = "", ticker: str = "", quantite: float = 0.0) -> pd.DataFrame:
+              ticker: str = "", quantite: float = 0.0) -> pd.DataFrame:
     new_row = pd.DataFrame(
-        [[nom, categorie, montant, notes, ticker, quantite]],
+        [[nom, categorie, montant, ticker, quantite]],
         columns=df.columns
     )
     df = pd.concat([df, new_row], ignore_index=True)
@@ -18,11 +18,10 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
 
 
 def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: float,
-                 notes: str = "", ticker: str = "", quantite: float = 0.0) -> pd.DataFrame:
+                 ticker: str = "", quantite: float = 0.0) -> pd.DataFrame:
     df.loc[idx, "nom"] = nom
     df.loc[idx, "categorie"] = categorie
     df.loc[idx, "montant"] = montant
-    df.loc[idx, "notes"] = notes
     df.loc[idx, "ticker"] = ticker
     df.loc[idx, "quantite"] = quantite
     save_assets(df)
