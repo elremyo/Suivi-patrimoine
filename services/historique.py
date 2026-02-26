@@ -85,9 +85,15 @@ def build_total_evolution(
     if all_dates.empty:
         return pd.DataFrame(columns=["date", "total"])
 
+    # Ne reconstruire qu'à partir de la première date où on a des données réelles
+    earliest = _earliest_known_date(df_hist, df_positions)
+    if earliest is not None:
+        all_dates = all_dates[all_dates >= earliest]
+
     records = []
     for d in all_dates:
         total = 0.0
+        has_value = False
         for _, asset in df_assets.iterrows():
             if asset["categorie"] in categories_auto and asset["ticker"]:
                 val = _auto_value_at(asset, d, df_positions, df_prices)
@@ -95,7 +101,10 @@ def build_total_evolution(
                 val = get_montant_at(asset["id"], d, df_hist)
             if val is not None:
                 total += val
-        records.append({"date": d, "total": total})
+                has_value = True
+        # N'ajoute le point que si au moins un actif a contribué une valeur
+        if has_value:
+            records.append({"date": d, "total": total})
 
     result = pd.DataFrame(records)
     return result.sort_values("date").reset_index(drop=True)
@@ -118,9 +127,14 @@ def build_category_evolution(
     if all_dates.empty:
         return pd.DataFrame()
 
+    earliest = _earliest_known_date(df_hist, df_positions)
+    if earliest is not None:
+        all_dates = all_dates[all_dates >= earliest]
+
     records = []
     for d in all_dates:
         row = {"date": d}
+        has_value = False
         for cat in df_assets["categorie"].unique():
             cat_assets = df_assets[df_assets["categorie"] == cat]
             total_cat = 0.0
@@ -131,8 +145,10 @@ def build_category_evolution(
                     val = get_montant_at(asset["id"], d, df_hist)
                 if val is not None:
                     total_cat += val
+                    has_value = True
             row[cat] = total_cat
-        records.append(row)
+        if has_value:
+            records.append(row)
 
     pivot = pd.DataFrame(records).set_index("date").sort_index()
     return pivot
@@ -140,7 +156,7 @@ def build_category_evolution(
 
 # ── Helpers privés ────────────────────────────────────────────────────────────
 
-def _collect_all_dates(df_hist: pd.DataFrame, df_prices: pd.DataFrame) -> pd.Index:
+def _collect_all_dates(df_hist: pd.DataFrame, df_prices: pd.DataFrame) -> pd.DatetimeIndex:
     """Collecte toutes les dates disponibles dans les deux sources."""
     dates = set()
     if not df_hist.empty:
@@ -148,8 +164,20 @@ def _collect_all_dates(df_hist: pd.DataFrame, df_prices: pd.DataFrame) -> pd.Ind
     if not df_prices.empty:
         dates.update(pd.to_datetime(df_prices.index).normalize())
     if not dates:
-        return pd.Index([])
+        return pd.DatetimeIndex([])
     return pd.DatetimeIndex(sorted(dates))
+
+
+def _earliest_known_date(df_hist: pd.DataFrame, df_positions: pd.DataFrame) -> pd.Timestamp | None:
+    """Retourne la plus ancienne date où on a une donnée (historique manuel ou position)."""
+    candidates = []
+    if not df_hist.empty:
+        candidates.append(df_hist["date"].min())
+    if not df_positions.empty:
+        candidates.append(df_positions["date"].min())
+    if not candidates:
+        return None
+    return min(candidates)
 
 
 def _auto_value_at(
