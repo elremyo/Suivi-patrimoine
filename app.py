@@ -71,7 +71,15 @@ with st.sidebar:
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
             if nom:
                 df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
-                flash("Actif ajouté")
+                if ticker:
+                    df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+                    save_assets(df)
+                    if errors:
+                        flash(f"Actif ajouté, mais ticker introuvable : {', '.join(errors)}", type="warning")
+                    else:
+                        flash("Actif ajouté et prix synchronisé")
+                else:
+                    flash("Actif ajouté")
                 st.rerun()
             else:
                 st.warning("Le nom est obligatoire.")
@@ -207,7 +215,15 @@ with tab_actifs:
             c1, c2 = st.columns(2)
             if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
                 df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
-                flash("Actif modifié")
+                if ticker:
+                    df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+                    save_assets(df)
+                    if errors:
+                        flash(f"Actif modifié, mais ticker introuvable : {', '.join(errors)}", type="warning")
+                    else:
+                        flash("Actif modifié et prix synchronisé")
+                else:
+                    flash("Actif modifié")
                 del st.session_state["editing_idx"]
                 st.rerun()
             if c2.form_submit_button("Annuler", use_container_width=True):
