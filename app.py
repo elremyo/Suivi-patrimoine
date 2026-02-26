@@ -10,7 +10,7 @@ from services.historique import (
     init_historique, load_historique, record_montant, delete_asset_history,
     build_total_evolution, build_category_evolution,
 )
-from services.positions import init_positions, load_positions, record_position
+from services.positions import init_positions, load_positions, record_position, delete_asset_positions
 from services.pricer import refresh_auto_assets, get_name, fetch_historical_prices
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT
 
@@ -253,6 +253,7 @@ with tab_actifs:
             c1, c2 = st.columns(2)
             if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
                 delete_asset_history(row["id"])
+                delete_asset_positions(row["id"])
                 df = delete_asset(df, idx)
                 flash("Actif supprimé")
                 del st.session_state["deleting_idx"]

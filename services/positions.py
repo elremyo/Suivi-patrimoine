@@ -30,7 +30,6 @@ def record_position(asset_id: str, quantite: float, record_date: date | None = N
     d = pd.Timestamp(record_date or date.today())
     df = load_positions()
 
-    # Supprime l'éventuel enregistrement existant pour ce jour et cet actif
     if not df.empty:
         df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
 
@@ -38,6 +37,15 @@ def record_position(asset_id: str, quantite: float, record_date: date | None = N
     df = pd.concat([df, new_row], ignore_index=True)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
+    df.to_csv(POSITIONS_PATH, index=False)
+
+
+def delete_asset_positions(asset_id: str):
+    """Supprime toutes les positions d'un actif (utile à la suppression d'un actif)."""
+    df = load_positions()
+    if df.empty:
+        return
+    df = df[df["asset_id"] != asset_id].reset_index(drop=True)
     df.to_csv(POSITIONS_PATH, index=False)
 
 
