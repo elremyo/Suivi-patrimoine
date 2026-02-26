@@ -70,7 +70,7 @@ with st.sidebar:
             pru = 0.0
             montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
 
-        if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
+        if st.form_submit_button("Ajouter", type="primary", width="stretch"):
             if is_auto and not ticker:
                 st.warning("Le ticker est obligatoire.")
             elif not is_auto and not nom:
@@ -109,7 +109,7 @@ with st.sidebar:
     )
 
     if st.button("🔄 Actualiser les prix", disabled=not has_auto_assets,
-                 use_container_width=True):
+                 width="stretch"):
         with st.spinner("Récupération des prix…"):
             df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
             save_assets(df)
@@ -130,7 +130,7 @@ with st.sidebar:
         file_name="patrimoine.csv",
         mime="text/csv",
         icon=":material/download:",
-        use_container_width=True,
+        width="stretch",
     ):
         pass  # Le téléchargement ne nécessite pas de rerun
 
@@ -230,7 +230,7 @@ with tab_actifs:
                                           index=CATEGORIES_ASSETS.index(row["categorie"]))
 
             c1, c2 = st.columns(2)
-            if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
+            if c1.form_submit_button("Sauvegarder", type="primary", width="stretch"):
                 if is_auto_edit and not ticker:
                     st.warning("Le ticker est obligatoire.")
                 elif not is_auto_edit and not nom:
@@ -254,7 +254,7 @@ with tab_actifs:
                         flash("Actif modifié")
                     del st.session_state["editing_idx"]
                     st.rerun()
-            if c2.form_submit_button("Annuler", use_container_width=True):
+            if c2.form_submit_button("Annuler", width="stretch"):
                 del st.session_state["editing_idx"]
                 st.rerun()
 
@@ -265,14 +265,14 @@ with tab_actifs:
         with st.container(border=True):
             st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
             c1, c2 = st.columns(2)
-            if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
+            if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", width="stretch"):
                 delete_asset_history(row["id"])
                 delete_asset_positions(row["id"])
                 df = delete_asset(df, idx)
                 flash("Actif supprimé")
                 del st.session_state["deleting_idx"]
                 st.rerun()
-            if c2.button("Annuler", key=f"cancel_del_{idx}", use_container_width=True):
+            if c2.button("Annuler", key=f"cancel_del_{idx}", width="stretch"):
                 del st.session_state["deleting_idx"]
                 st.rerun()
 
@@ -296,7 +296,7 @@ with tab_actifs:
             **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
             showlegend=False,
         )
-        st.plotly_chart(fig_pie, use_container_width=True, config={"staticPlot": True})
+        st.plotly_chart(fig_pie, width="stretch", config={"staticPlot": True})
 
 
 # ── Tab Historique ────────────────────────────────────────────────────────────
@@ -360,7 +360,7 @@ with tab_historique:
                 marker=dict(size=5),
             ))
             fig_total.update_layout(**PLOTLY_LAYOUT, yaxis_title="Patrimoine (€)", xaxis_title="Date")
-            st.plotly_chart(fig_total, use_container_width=True, config={"staticPlot": True})
+            st.plotly_chart(fig_total, width="stretch", config={"staticPlot": True})
 
         if not cat_evo.empty:
             st.subheader("Évolution par catégorie")
@@ -379,4 +379,4 @@ with tab_historique:
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
                             bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
             )
-            st.plotly_chart(fig_cat, use_container_width=True, config={"staticPlot": True})
+            st.plotly_chart(fig_cat, width="stretch", config={"staticPlot": True})
