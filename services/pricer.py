@@ -1,5 +1,6 @@
 import yfinance as yf
 import pandas as pd
+import streamlit as st
 
 
 def get_price(ticker: str) -> float | None:
@@ -55,11 +56,14 @@ def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
     return results
 
 
+@st.cache_data(ttl=3 * 3600, show_spinner=False)
 def fetch_historical_prices(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
     """
     Récupère les prix de clôture historiques pour une liste de tickers.
     Retourne un DataFrame pivot date × ticker.
     period : "1mo", "3mo", "1y", "5y", "max", etc.
+
+    Résultat mis en cache 3 heures via @st.cache_data.
     """
     if not tickers:
         return pd.DataFrame()

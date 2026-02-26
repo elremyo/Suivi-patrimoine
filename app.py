@@ -293,7 +293,7 @@ with tab_actifs:
 
 with tab_historique:
 
-    auto_tickers = (
+    auto_tickers = sorted(
         df[df["categorie"].isin(CATEGORIES_AUTO) & (df["ticker"] != "")]["ticker"]
         .dropna().unique().tolist()
     )
