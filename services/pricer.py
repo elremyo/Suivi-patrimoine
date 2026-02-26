@@ -57,23 +57,27 @@ def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
 
 
 @st.cache_data(ttl=3 * 3600, show_spinner=False)
-def fetch_historical_prices(tickers: list[str], period: str = "1y") -> pd.DataFrame:
+def fetch_historical_prices(tickers: tuple, period: str = "3mo") -> pd.DataFrame:
     """
     Récupère les prix de clôture historiques pour une liste de tickers.
     Retourne un DataFrame pivot date × ticker.
-    period : "1mo", "3mo", "1y", "5y", "max", etc.
+    period : "5d", "1mo", "3mo", "6mo", "1y", "max", etc.
 
-    Résultat mis en cache 3 heures via @st.cache_data.
+    Accepte un tuple (hashable) pour que @st.cache_data puisse construire la clé de cache.
+    Le cache est séparé par combinaison (tickers, period).
     """
+    print(f"[FETCH yfinance] tickers={tickers} / period={period}")  # ← BEBUG
+
     if not tickers:
         return pd.DataFrame()
+    tickers_list = list(tickers)
     try:
-        data = yf.download(tickers, period=period, progress=False, auto_adjust=True)
+        data = yf.download(tickers_list, period=period, progress=False, auto_adjust=True)
         if data.empty:
             return pd.DataFrame()
         close = data["Close"]
         if isinstance(close, pd.Series):
-            close = close.to_frame(name=tickers[0])
+            close = close.to_frame(name=tickers_list[0])
         close.index = pd.to_datetime(close.index).normalize()
         return close
     except Exception:

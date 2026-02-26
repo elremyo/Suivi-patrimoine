@@ -301,6 +301,16 @@ with tab_actifs:
 
 # ── Tab Historique ────────────────────────────────────────────────────────────
 
+# Mapping période label → (yfinance period, nb jours pour filtre, None = pas de filtre)
+PERIOD_OPTIONS = {
+    "1S":  ("5d",   7),
+    "1M":  ("1mo",  30),
+    "3M":  ("3mo",  90),
+    "6M":  ("6mo",  180),
+    "1A":  ("1y",   365),
+    "Max": ("max",  None),
+}
+
 with tab_historique:
 
     auto_tickers = sorted(
@@ -313,10 +323,32 @@ with tab_historique:
     if not has_history:
         st.info("Aucun historique disponible. Ajoutez des actifs et mettez à jour leurs montants pour construire un historique.")
     else:
+        # Sélecteur de période
+        period_label = st.segmented_control(
+            "Période",
+            options=list(PERIOD_OPTIONS.keys()),
+            default="3M",
+            key="period_selector",
+        )
+        yf_period, nb_jours = PERIOD_OPTIONS[period_label]
+
+        # Calcul de la date de début pour le filtre
+        if nb_jours is not None:
+            start_date = pd.Timestamp.today().normalize() - pd.Timedelta(days=nb_jours)
+        else:
+            start_date = None
+
         with st.spinner("Reconstruction de l'historique…"):
-            df_prices = fetch_historical_prices(auto_tickers) if auto_tickers else pd.DataFrame()
+            df_prices = fetch_historical_prices(tuple(auto_tickers), yf_period) if auto_tickers else pd.DataFrame()
             total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
             cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
+
+        # Filtrage par période
+        if start_date is not None:
+            if not total_evo.empty:
+                total_evo = total_evo[total_evo["date"] >= start_date]
+            if not cat_evo.empty:
+                cat_evo = cat_evo[cat_evo.index >= start_date]
 
         if not total_evo.empty:
             st.subheader("Évolution du patrimoine total")
