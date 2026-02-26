@@ -7,20 +7,22 @@ from services.assets import (
     compute_total, compute_by_category,
 )
 from services.historique import (
-    init_historique, load_historique, save_snapshot, delete_snapshot,
-    get_total_evolution, get_category_evolution, get_snapshot_table,
-    get_last_two_snapshots_totals,
+    init_historique, load_historique, record_montant, delete_asset_history,
+    build_total_evolution, build_category_evolution,
 )
-from services.pricer import refresh_auto_assets, get_name
+from services.positions import init_positions, load_positions, record_position
+from services.pricer import refresh_auto_assets, get_name, fetch_historical_prices
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT
 
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
 init_storage()
 init_historique()
+init_positions()
 
 df = get_assets()
 df_hist = load_historique()
+df_positions = load_positions()
 
 
 def flash(msg: str, type: str = "success"):
@@ -78,6 +80,8 @@ with st.sidebar:
                     with st.spinner("Récupération du nom et du prix…"):
                         nom = get_name(ticker)
                         df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
+                        asset_id = df.iloc[-1]["id"]
+                        record_position(asset_id, quantite)
                         df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
                         save_assets(df)
                     if errors:
@@ -86,6 +90,8 @@ with st.sidebar:
                         flash(f"Actif ajouté et prix synchronisé ({nom})")
                 else:
                     df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
+                    asset_id = df.iloc[-1]["id"]
+                    record_montant(asset_id, montant)
                     flash("Actif ajouté")
                 st.rerun()
 
@@ -112,17 +118,6 @@ with st.sidebar:
         else:
             flash("Prix mis à jour")
         st.rerun()
-
-    show_flash()
-
-    st.divider()
-
-    st.subheader("Historique")
-    if st.button("📸 Enregistrer un snapshot", disabled=df.empty, use_container_width=True, type="primary"):
-        if save_snapshot(df):
-            flash("Snapshot enregistré")
-            st.rerun()
-    st.caption("Un seul snapshot par jour — le dernier écrase le précédent.")
 
     show_flash()
 
@@ -208,6 +203,7 @@ with tab_actifs:
                 pru = st.number_input("PRU (€)", min_value=0.0,
                                       value=float(pru_current), step=1.0, format="%g")
                 montant = float(row["montant"])
+                nom = row["nom"]
             else:
                 nom = st.text_input("Nom *", value=row["nom"])
                 ticker = ""
@@ -230,6 +226,8 @@ with tab_actifs:
                         new_nom = get_name(ticker) if ticker != ticker_current else row["nom"]
                         with st.spinner("Synchronisation du prix…"):
                             df = update_asset(df, idx, new_nom, categorie_edit, montant, ticker, quantite, pru)
+                            if quantite != quantite_current:
+                                record_position(row["id"], quantite)
                             df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
                             save_assets(df)
                         if errors:
@@ -238,6 +236,7 @@ with tab_actifs:
                             flash("Actif modifié et prix synchronisé")
                     else:
                         df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
+                        record_montant(row["id"], montant)
                         flash("Actif modifié")
                     del st.session_state["editing_idx"]
                     st.rerun()
@@ -253,6 +252,7 @@ with tab_actifs:
             st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
             c1, c2 = st.columns(2)
             if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
+                delete_asset_history(row["id"])
                 df = delete_asset(df, idx)
                 flash("Actif supprimé")
                 del st.session_state["deleting_idx"]
@@ -264,23 +264,11 @@ with tab_actifs:
     st.divider()
 
     total = compute_total(df)
-    dernier, avant_dernier = get_last_two_snapshots_totals(df_hist)
-
-    if dernier and avant_dernier:
-        delta_total = dernier["total"] - avant_dernier["total"]
-        delta_str = (
-            f"{delta_total:+,.2f} € "
-            f"({avant_dernier['date'].strftime('%d/%m/%Y')} → {dernier['date'].strftime('%d/%m/%Y')})"
-        )
-    else:
-        delta_str = None
-
-    st.metric(label="Patrimoine total", value=f"{total:,.2f} €", delta=delta_str)
+    st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
 
     stats = compute_by_category(df)
     if not stats.empty:
         st.subheader("Répartition par catégorie")
-
         fig_pie = go.Figure(go.Pie(
             labels=stats["categorie"],
             values=stats["montant"],
@@ -300,56 +288,48 @@ with tab_actifs:
 
 with tab_historique:
 
-    if df_hist.empty:
-        st.info("Aucun historique. Enregistrez un premier snapshot depuis le panneau latéral.")
+    auto_tickers = (
+        df[df["categorie"].isin(CATEGORIES_AUTO) & (df["ticker"] != "")]["ticker"]
+        .dropna().unique().tolist()
+    )
+
+    has_history = not df_hist.empty or (not df_positions.empty and bool(auto_tickers))
+
+    if not has_history:
+        st.info("Aucun historique disponible. Ajoutez des actifs et mettez à jour leurs montants pour construire un historique.")
     else:
-        st.subheader("Évolution du patrimoine total")
-        total_evo = get_total_evolution(df_hist)
-        fig_total = go.Figure()
-        fig_total.add_trace(go.Scatter(
-            x=total_evo["date"], y=total_evo["total"],
-            mode="lines+markers", name="Total",
-            line=dict(color=CATEGORY_COLORS[0], width=2),
-            marker=dict(size=5),
-        ))
-        fig_total.update_layout(**PLOTLY_LAYOUT, yaxis_title="Patrimoine (€)", xaxis_title="Date")
-        st.plotly_chart(fig_total, use_container_width=True, config={"staticPlot": True})
+        with st.spinner("Reconstruction de l'historique…"):
+            df_prices = fetch_historical_prices(auto_tickers) if auto_tickers else pd.DataFrame()
+            total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
+            cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
 
-        st.subheader("Évolution par catégorie")
-        cat_evo = get_category_evolution(df_hist)
-        fig_cat = go.Figure()
-        for i, col in enumerate(cat_evo.columns):
-            color = CATEGORY_COLORS[i % len(CATEGORY_COLORS)]
-            fig_cat.add_trace(go.Scatter(
-                x=cat_evo.index, y=cat_evo[col],
-                mode="lines+markers", name=col,
-                line=dict(color=color, width=2),
-                marker=dict(size=5, color=color),
+        if not total_evo.empty:
+            st.subheader("Évolution du patrimoine total")
+            fig_total = go.Figure()
+            fig_total.add_trace(go.Scatter(
+                x=total_evo["date"], y=total_evo["total"],
+                mode="lines+markers", name="Total",
+                line=dict(color=CATEGORY_COLORS[0], width=2),
+                marker=dict(size=5),
             ))
-        fig_cat.update_layout(
-            **PLOTLY_LAYOUT,
-            yaxis_title="Montant (€)", xaxis_title="Date",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                        bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
-        )
-        st.plotly_chart(fig_cat, use_container_width=True, config={"staticPlot": True})
+            fig_total.update_layout(**PLOTLY_LAYOUT, yaxis_title="Patrimoine (€)", xaxis_title="Date")
+            st.plotly_chart(fig_total, use_container_width=True, config={"staticPlot": True})
 
-        st.subheader("Tableau des snapshots")
-        snap_table = get_snapshot_table(df_hist)
-        formatted = snap_table.copy()
-        for col in formatted.columns:
-            formatted[col] = formatted[col].apply(lambda x: f"{x:,.2f} €")
-        st.dataframe(formatted, use_container_width=True)
-
-        with st.expander("Supprimer un snapshot"):
-            show_flash()
-            dates_dispo = sorted(df_hist["date"].dt.date.unique(), reverse=True)
-            date_to_delete = st.selectbox(
-                "Choisir la date à supprimer",
-                options=dates_dispo,
-                format_func=lambda d: d.strftime("%d/%m/%Y"),
+        if not cat_evo.empty:
+            st.subheader("Évolution par catégorie")
+            fig_cat = go.Figure()
+            for i, col in enumerate(cat_evo.columns):
+                color = CATEGORY_COLORS[i % len(CATEGORY_COLORS)]
+                fig_cat.add_trace(go.Scatter(
+                    x=cat_evo.index, y=cat_evo[col],
+                    mode="lines+markers", name=col,
+                    line=dict(color=color, width=2),
+                    marker=dict(size=5, color=color),
+                ))
+            fig_cat.update_layout(
+                **PLOTLY_LAYOUT,
+                yaxis_title="Montant (€)", xaxis_title="Date",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                            bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
             )
-            if st.button("Supprimer ce snapshot", icon=":material/delete:"):
-                df_hist = delete_snapshot(df_hist, date_to_delete)
-                flash("Snapshot supprimé")
-                st.rerun()
+            st.plotly_chart(fig_cat, use_container_width=True, config={"staticPlot": True})

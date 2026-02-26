@@ -4,7 +4,7 @@ from datetime import date
 from pandas.errors import EmptyDataError
 
 HISTORIQUE_PATH = "data/historique.csv"
-COLUMNS = ["date", "categorie", "montant"]
+COLUMNS = ["asset_id", "date", "montant"]
 
 
 def init_historique():
@@ -22,94 +22,157 @@ def load_historique() -> pd.DataFrame:
         return pd.DataFrame(columns=COLUMNS)
 
 
-def save_snapshot(df_assets: pd.DataFrame, snapshot_date: date | None = None) -> bool:
+def record_montant(asset_id: str, montant: float, record_date: date | None = None):
     """
-    Enregistre l'état actuel des actifs groupés par catégorie.
-    Si un snapshot existe déjà pour cette date, il est remplacé.
-    Retourne True si sauvegardé, False si df_assets est vide.
+    Enregistre le montant d'un actif manuel à une date donnée.
+    Si un enregistrement existe déjà pour ce jour et cet actif, il est écrasé.
+    """
+    d = pd.Timestamp(record_date or date.today())
+    df = load_historique()
+
+    if not df.empty:
+        df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
+
+    new_row = pd.DataFrame([[asset_id, d, montant]], columns=COLUMNS)
+    df = pd.concat([df, new_row], ignore_index=True)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
+    df.to_csv(HISTORIQUE_PATH, index=False)
+
+
+def delete_asset_history(asset_id: str):
+    """Supprime tout l'historique d'un actif (utile à la suppression d'un actif)."""
+    df = load_historique()
+    if df.empty:
+        return
+    df = df[df["asset_id"] != asset_id].reset_index(drop=True)
+    df.to_csv(HISTORIQUE_PATH, index=False)
+
+
+def get_montant_at(asset_id: str, at_date: pd.Timestamp, df_hist: pd.DataFrame) -> float | None:
+    """
+    Retourne le dernier montant connu pour un actif manuel avant ou à at_date.
+    Retourne None si aucun enregistrement n'existe.
+    """
+    asset_hist = df_hist[df_hist["asset_id"] == asset_id]
+    past = asset_hist[asset_hist["date"] <= at_date]
+    if past.empty:
+        return None
+    return float(past.sort_values("date").iloc[-1]["montant"])
+
+
+def build_total_evolution(
+    df_assets: pd.DataFrame,
+    df_hist: pd.DataFrame,
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+    categories_auto: set,
+) -> pd.DataFrame:
+    """
+    Reconstruit la courbe d'évolution du patrimoine total en fusionnant :
+    - les actifs auto  : prix historiques yfinance × quantité connue à chaque date
+    - les actifs manuels : historique CSV (dernier montant connu à chaque date)
+
+    df_prices : DataFrame pivot date × ticker (prix de clôture historiques, depuis yfinance)
+    df_positions : journal des quantités (asset_id, date, quantite)
+
+    Retourne un DataFrame { date, total }.
     """
     if df_assets.empty:
-        return False
-
-    d = snapshot_date or date.today()
-
-    grouped = (
-        df_assets.groupby("categorie")["montant"]
-        .sum()
-        .reset_index()
-    )
-    grouped.insert(0, "date", d)
-    grouped.columns = COLUMNS
-
-    df_hist = load_historique()
-
-    # Supprime l'éventuel snapshot existant pour cette date
-    df_hist = df_hist[df_hist["date"] != pd.Timestamp(d)] if not df_hist.empty else df_hist
-
-    df_hist = pd.concat([df_hist, grouped], ignore_index=True)
-    df_hist["date"] = pd.to_datetime(df_hist["date"])
-    df_hist = df_hist.sort_values("date").reset_index(drop=True)
-    df_hist.to_csv(HISTORIQUE_PATH, index=False)
-    return True
-
-
-def delete_snapshot(df_hist: pd.DataFrame, snapshot_date: date) -> pd.DataFrame:
-    df_hist = df_hist[df_hist["date"] != pd.Timestamp(snapshot_date)].reset_index(drop=True)
-    df_hist.to_csv(HISTORIQUE_PATH, index=False)
-    return df_hist
-
-
-def get_total_evolution(df_hist: pd.DataFrame) -> pd.DataFrame:
-    """Retourne une série date → total patrimoine."""
-    if df_hist.empty:
         return pd.DataFrame(columns=["date", "total"])
-    result = df_hist.groupby("date")["montant"].sum().reset_index()
-    result.columns = ["date", "total"]
-    return result.sort_values("date")
+
+    all_dates = _collect_all_dates(df_hist, df_prices)
+    if all_dates.empty:
+        return pd.DataFrame(columns=["date", "total"])
+
+    records = []
+    for d in all_dates:
+        total = 0.0
+        for _, asset in df_assets.iterrows():
+            if asset["categorie"] in categories_auto and asset["ticker"]:
+                val = _auto_value_at(asset, d, df_positions, df_prices)
+            else:
+                val = get_montant_at(asset["id"], d, df_hist)
+            if val is not None:
+                total += val
+        records.append({"date": d, "total": total})
+
+    result = pd.DataFrame(records)
+    return result.sort_values("date").reset_index(drop=True)
 
 
-def get_category_evolution(df_hist: pd.DataFrame) -> pd.DataFrame:
-    """Retourne un pivot date × catégorie."""
-    if df_hist.empty:
+def build_category_evolution(
+    df_assets: pd.DataFrame,
+    df_hist: pd.DataFrame,
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+    categories_auto: set,
+) -> pd.DataFrame:
+    """
+    Même logique que build_total_evolution mais retourne un pivot date × catégorie.
+    """
+    if df_assets.empty:
         return pd.DataFrame()
-    pivot = df_hist.pivot_table(
-        index="date", columns="categorie", values="montant", aggfunc="sum"
-    ).fillna(0)
-    pivot.index = pd.to_datetime(pivot.index)
-    return pivot.sort_index()
 
-
-def get_snapshot_table(df_hist: pd.DataFrame) -> pd.DataFrame:
-    """Retourne un tableau récapitulatif par snapshot (date × catégorie + total)."""
-    if df_hist.empty:
+    all_dates = _collect_all_dates(df_hist, df_prices)
+    if all_dates.empty:
         return pd.DataFrame()
-    pivot = get_category_evolution(df_hist).copy()
-    pivot["Total"] = pivot.sum(axis=1)
-    pivot.index = pivot.index.strftime("%d/%m/%Y")
-    pivot.index.name = "Date"
+
+    records = []
+    for d in all_dates:
+        row = {"date": d}
+        for cat in df_assets["categorie"].unique():
+            cat_assets = df_assets[df_assets["categorie"] == cat]
+            total_cat = 0.0
+            for _, asset in cat_assets.iterrows():
+                if asset["categorie"] in categories_auto and asset["ticker"]:
+                    val = _auto_value_at(asset, d, df_positions, df_prices)
+                else:
+                    val = get_montant_at(asset["id"], d, df_hist)
+                if val is not None:
+                    total_cat += val
+            row[cat] = total_cat
+        records.append(row)
+
+    pivot = pd.DataFrame(records).set_index("date").sort_index()
     return pivot
 
 
-def get_last_two_snapshots_totals(df_hist: pd.DataFrame) -> tuple:
-    """
-    Retourne les totaux des deux derniers snapshots sous forme de tuple (dernier, avant-dernier).
-    Chaque élément : { "total": float, "par_categorie": { categorie: float }, "date": date }
-    Retourne (dernier, None) s'il n'y a qu'un seul snapshot, (None, None) si vide.
-    """
-    if df_hist.empty:
-        return None, None
+# ── Helpers privés ────────────────────────────────────────────────────────────
 
-    dates = sorted(df_hist["date"].unique(), reverse=True)
+def _collect_all_dates(df_hist: pd.DataFrame, df_prices: pd.DataFrame) -> pd.Index:
+    """Collecte toutes les dates disponibles dans les deux sources."""
+    dates = set()
+    if not df_hist.empty:
+        dates.update(df_hist["date"].dt.normalize().unique())
+    if not df_prices.empty:
+        dates.update(pd.to_datetime(df_prices.index).normalize())
+    if not dates:
+        return pd.Index([])
+    return pd.DatetimeIndex(sorted(dates))
 
-    def _build(date):
-        rows = df_hist[df_hist["date"] == date]
-        return {
-            "total": rows["montant"].sum(),
-            "par_categorie": rows.set_index("categorie")["montant"].to_dict(),
-            "date": pd.Timestamp(date),
-        }
 
-    dernier = _build(dates[0])
-    avant_dernier = _build(dates[1]) if len(dates) >= 2 else None
+def _auto_value_at(
+    asset: pd.Series,
+    at_date: pd.Timestamp,
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+) -> float | None:
+    """Calcule la valeur d'un actif auto à une date : prix × quantité connue."""
+    from services.positions import get_quantity_at
 
-    return dernier, avant_dernier
+    ticker = asset["ticker"]
+    quantite = get_quantity_at(asset["id"], at_date, df_positions)
+    if quantite is None:
+        return None
+
+    if df_prices.empty or ticker not in df_prices.columns:
+        return None
+
+    prices_series = df_prices[ticker].dropna()
+    past_prices = prices_series[prices_series.index.normalize() <= at_date.normalize()]
+    if past_prices.empty:
+        return None
+
+    price = float(past_prices.iloc[-1])
+    return round(price * quantite, 2)

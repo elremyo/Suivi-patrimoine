@@ -9,8 +9,7 @@ def get_price(ticker: str) -> float | None:
     """
     try:
         data = yf.Ticker(ticker)
-        info = data.fast_info
-        price = info.last_price
+        price = data.fast_info.last_price
         if price and price > 0:
             return round(price, 4)
         return None
@@ -28,7 +27,8 @@ def get_name(ticker: str) -> str:
         return info.get("longName") or info.get("shortName") or ticker
     except Exception:
         return ticker
-    
+
+
 def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
     """
     Retourne un dict { ticker: prix } pour une liste de tickers.
@@ -42,7 +42,6 @@ def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
         data = yf.download(tickers, period="1d", progress=False, auto_adjust=True)
         close = data["Close"]
         if isinstance(close, pd.Series):
-            # Un seul ticker retourné comme Series
             close = close.to_frame(name=tickers[0])
         for ticker in tickers:
             if ticker in close.columns and not close[ticker].dropna().empty:
@@ -54,6 +53,27 @@ def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
             results[ticker] = None
 
     return results
+
+
+def fetch_historical_prices(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
+    """
+    Récupère les prix de clôture historiques pour une liste de tickers.
+    Retourne un DataFrame pivot date × ticker.
+    period : "1mo", "3mo", "1y", "5y", "max", etc.
+    """
+    if not tickers:
+        return pd.DataFrame()
+    try:
+        data = yf.download(tickers, period=period, progress=False, auto_adjust=True)
+        if data.empty:
+            return pd.DataFrame()
+        close = data["Close"]
+        if isinstance(close, pd.Series):
+            close = close.to_frame(name=tickers[0])
+        close.index = pd.to_datetime(close.index).normalize()
+        return close
+    except Exception:
+        return pd.DataFrame()
 
 
 def refresh_auto_assets(df: pd.DataFrame, categories_auto: set) -> tuple[pd.DataFrame, list[str]]:
