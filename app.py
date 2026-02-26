@@ -144,6 +144,16 @@ tab_actifs, tab_historique = st.tabs(["📋 Actifs", "📈 Historique"])
 
 with tab_actifs:
 
+    # Refresh automatique au premier chargement de la session
+    if "prices_refreshed" not in st.session_state and has_auto_assets:
+        with st.spinner("Actualisation des prix en cours…"):
+            df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+            save_assets(df)
+        st.session_state["prices_refreshed"] = True
+        if errors:
+            flash(f"Tickers introuvables : {', '.join(errors)}", type="warning")
+        st.rerun()
+
     show_flash()
 
     st.subheader("Actifs")

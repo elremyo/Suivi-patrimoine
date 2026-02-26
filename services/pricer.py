@@ -57,7 +57,7 @@ def get_prices_bulk(tickers: list[str]) -> dict[str, float | None]:
 
 
 @st.cache_data(ttl=3 * 3600, show_spinner=False)
-def fetch_historical_prices(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
+def fetch_historical_prices(tickers: list[str], period: str = "1y") -> pd.DataFrame:
     """
     Récupère les prix de clôture historiques pour une liste de tickers.
     Retourne un DataFrame pivot date × ticker.
