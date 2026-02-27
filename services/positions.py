@@ -3,13 +3,14 @@ import pandas as pd
 from datetime import date
 from pandas.errors import EmptyDataError
 from constants import POSITIONS_PATH
+from services.storage import safe_write_csv
 
 COLUMNS = ["asset_id", "date", "quantite"]
 
 
 def init_positions():
     if not os.path.exists(POSITIONS_PATH):
-        pd.DataFrame(columns=COLUMNS).to_csv(POSITIONS_PATH, index=False)
+        safe_write_csv(pd.DataFrame(columns=COLUMNS), POSITIONS_PATH)
 
 
 def load_positions() -> pd.DataFrame:
@@ -37,7 +38,7 @@ def record_position(asset_id: str, quantite: float, record_date: date | None = N
     df = pd.concat([df, new_row], ignore_index=True)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
-    df.to_csv(POSITIONS_PATH, index=False)
+    safe_write_csv(df, POSITIONS_PATH)
 
 
 def delete_asset_positions(asset_id: str):
@@ -46,7 +47,7 @@ def delete_asset_positions(asset_id: str):
     if df.empty:
         return
     df = df[df["asset_id"] != asset_id].reset_index(drop=True)
-    df.to_csv(POSITIONS_PATH, index=False)
+    safe_write_csv(df, POSITIONS_PATH)
 
 
 def get_quantity_at(asset_id: str, at_date: pd.Timestamp, df_positions: pd.DataFrame) -> float | None:

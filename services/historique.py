@@ -3,13 +3,14 @@ import pandas as pd
 from datetime import date
 from pandas.errors import EmptyDataError
 from constants import HISTORIQUE_PATH
+from services.storage import safe_write_csv
 
 COLUMNS = ["asset_id", "date", "montant"]
 
 
 def init_historique():
     if not os.path.exists(HISTORIQUE_PATH):
-        pd.DataFrame(columns=COLUMNS).to_csv(HISTORIQUE_PATH, index=False)
+        safe_write_csv(pd.DataFrame(columns=COLUMNS), HISTORIQUE_PATH)
 
 
 def load_historique() -> pd.DataFrame:
@@ -37,7 +38,7 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
     df = pd.concat([df, new_row], ignore_index=True)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
-    df.to_csv(HISTORIQUE_PATH, index=False)
+    safe_write_csv(df, HISTORIQUE_PATH)
 
 
 def delete_asset_history(asset_id: str):
@@ -46,7 +47,7 @@ def delete_asset_history(asset_id: str):
     if df.empty:
         return
     df = df[df["asset_id"] != asset_id].reset_index(drop=True)
-    df.to_csv(HISTORIQUE_PATH, index=False)
+    safe_write_csv(df, HISTORIQUE_PATH)
 
 
 def get_montant_at(asset_id: str, at_date: pd.Timestamp, df_hist: pd.DataFrame) -> float | None:
