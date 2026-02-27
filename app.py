@@ -12,7 +12,7 @@ from services.historique import (
 )
 from services.positions import init_positions, load_positions, record_position, delete_asset_positions
 from services.pricer import refresh_auto_assets, get_name, fetch_historical_prices
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
 
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
@@ -290,7 +290,7 @@ with tab_actifs:
         fig_pie = go.Figure(go.Pie(
             labels=stats["categorie"],
             values=stats["montant"],
-            marker=dict(colors=CATEGORY_COLORS[:len(stats)]),
+            marker=dict(colors=[CATEGORY_COLOR_MAP.get(cat, "#CCCCCC") for cat in stats["categorie"]]),
             textinfo="label+percent",
             textfont=dict(color="#E8EAF0", size=13),
             hole=0.35,
@@ -335,7 +335,6 @@ with tab_historique:
             df_prices = fetch_historical_prices(tuple(auto_tickers), yf_period) if auto_tickers else pd.DataFrame()
             total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
             cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
-            asset_evo = build_asset_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
 
         # Filtrage par période
         if start_date is not None:
@@ -343,19 +342,16 @@ with tab_historique:
                 total_evo = total_evo[total_evo["date"] >= start_date]
             if not cat_evo.empty:
                 cat_evo = cat_evo[cat_evo.index >= start_date]
-            if not asset_evo.empty:
-                asset_evo = asset_evo[asset_evo.index >= start_date]
 
         # Construction des options du multiselect
         options_total = ["Total patrimoine"]
         options_cat = list(cat_evo.columns) if not cat_evo.empty else []
-        options_assets = list(asset_evo.columns) if not asset_evo.empty else []
-        all_options = options_total + options_cat + options_assets
+        all_options = options_total + options_cat
 
         selected = st.multiselect(
             "Séries à afficher",
             options=all_options,
-            default=options_total + options_cat,
+            default=all_options,
             placeholder="Choisir au moins une série…",
         )
 
@@ -363,13 +359,12 @@ with tab_historique:
             st.info("Sélectionne au moins une série à afficher.")
         else:
             fig = go.Figure()
-            color_idx = 0
+            fallback_idx = 0
 
             for serie in selected:
-                color = CATEGORY_COLORS[color_idx % len(CATEGORY_COLORS)]
-                color_idx += 1
-
                 if serie == "Total patrimoine" and not total_evo.empty:
+                    # Couleur neutre fixe pour le total
+                    color = "#E8EAF0"
                     fig.add_trace(go.Scatter(
                         x=total_evo["date"], y=total_evo["total"],
                         mode="lines+markers", name=serie,
@@ -377,15 +372,12 @@ with tab_historique:
                         marker=dict(size=5),
                     ))
                 elif serie in options_cat and not cat_evo.empty and serie in cat_evo.columns:
+                    # Couleur fixe par catégorie, fallback sur la palette si inconnue
+                    color = CATEGORY_COLOR_MAP.get(serie)
+                    if serie not in CATEGORY_COLOR_MAP:
+                        fallback_idx += 1
                     fig.add_trace(go.Scatter(
                         x=cat_evo.index, y=cat_evo[serie],
-                        mode="lines+markers", name=serie,
-                        line=dict(color=color, width=2),
-                        marker=dict(size=5),
-                    ))
-                elif serie in options_assets and not asset_evo.empty and serie in asset_evo.columns:
-                    fig.add_trace(go.Scatter(
-                        x=asset_evo.index, y=asset_evo[serie],
                         mode="lines+markers", name=serie,
                         line=dict(color=color, width=2),
                         marker=dict(size=5),

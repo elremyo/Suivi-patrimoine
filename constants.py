@@ -16,6 +16,15 @@ CATEGORY_COLORS = [
     "#A4E84C", "#85357d", "#486df0", "#6f50e5", "#A78BFA",
 ]
 
+# Couleur fixe par catégorie (indépendant de l'ordre d'affichage)
+CATEGORY_COLOR_MAP = {
+    "Actions & Fonds": "#85357d",
+    "Crypto":          "#6f50e5",
+    "Livrets":         "#486df0",
+    "Immobilier":      "#E8547A",
+    "Fonds euros":     "#A78BFA",
+}
+
 PLOTLY_LAYOUT = dict(
     paper_bgcolor="#1A1D27",
     plot_bgcolor="#1A1D27",
