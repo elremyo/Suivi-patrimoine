@@ -10,12 +10,19 @@ data/*
 __pycache__/
 *.pyc
 
-# Streamlit cache
-.streamlit/
+# Pytest
+.pytest_cache/
+
+# Streamlit
+.streamlit/secrets.toml
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Autre
+# IDE
+.vscode/
+
+# Scripts locaux
 run.bat
+run_tests.bat

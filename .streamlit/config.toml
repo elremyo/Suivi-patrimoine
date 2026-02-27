@@ -1,0 +1,13 @@
+[theme]
+base = "dark"
+
+# Bleu principal
+primaryColor = "#4C9BE8"
+
+# Fonds
+backgroundColor = "#0F1117"
+secondaryBackgroundColor = "#1A1D27"
+
+# Texte
+textColor = "#E8EAF0"
+font = "sans serif"
