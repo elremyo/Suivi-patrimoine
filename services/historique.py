@@ -152,6 +152,49 @@ def build_category_evolution(
     return pivot
 
 
+def build_asset_evolution(
+    df_assets: pd.DataFrame,
+    df_hist: pd.DataFrame,
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+    categories_auto: set,
+) -> pd.DataFrame:
+    """
+    Même logique que build_category_evolution mais retourne un pivot date × nom d'actif.
+    La colonne est le nom de l'actif (pas l'id).
+    """
+    if df_assets.empty:
+        return pd.DataFrame()
+
+    all_dates = _collect_all_dates(df_hist, df_prices)
+    if all_dates.empty:
+        return pd.DataFrame()
+
+    earliest = _earliest_known_date(df_hist, df_positions)
+    if earliest is not None:
+        all_dates = all_dates[all_dates >= earliest]
+
+    records = []
+    for d in all_dates:
+        row = {"date": d}
+        has_value = False
+        for _, asset in df_assets.iterrows():
+            if asset["categorie"] in categories_auto and asset["ticker"]:
+                val = _auto_value_at(asset, d, df_positions, df_prices)
+            else:
+                val = get_montant_at(asset["id"], d, df_hist)
+            if val is not None:
+                row[asset["nom"]] = val
+                has_value = True
+            else:
+                row[asset["nom"]] = 0.0
+        if has_value:
+            records.append(row)
+
+    pivot = pd.DataFrame(records).set_index("date").sort_index()
+    return pivot
+
+
 # ── Helpers privés ────────────────────────────────────────────────────────────
 
 def _collect_all_dates(df_hist: pd.DataFrame, df_prices: pd.DataFrame) -> pd.DatetimeIndex:

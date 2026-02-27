@@ -58,7 +58,6 @@ with st.sidebar:
     with st.form("add_asset", clear_on_submit=True):
         if is_auto:
             ticker = st.text_input("Ticker *", placeholder="ex. AAPL, BTC-USD, CW8.PA")
-            ticker = ticker.strip().upper()
             quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
             pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
                                   help="Prix de Revient Unitaire.")
@@ -110,7 +109,7 @@ with st.sidebar:
     )
 
     if st.button("🔄 Actualiser les prix", disabled=not has_auto_assets,
-                 width="stretch"):
+                 use_container_width=True):
         with st.spinner("Récupération des prix…"):
             df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
             save_assets(df)
@@ -214,7 +213,6 @@ with tab_actifs:
                               help="Nom récupéré automatiquement depuis yfinance.")
                 ticker = st.text_input("Ticker *", value=ticker_current,
                                        placeholder="ex. AAPL, BTC-USD, CW8.PA")
-                ticker = ticker.strip().upper()
                 quantite = st.number_input("Quantité", min_value=0.0,
                                            value=float(quantite_current), step=1.0, format="%g")
                 pru = st.number_input("PRU (€)", min_value=0.0,
@@ -256,7 +254,7 @@ with tab_actifs:
                         flash("Actif modifié")
                     del st.session_state["editing_idx"]
                     st.rerun()
-            if c2.form_submit_button("Annuler", width="stretch"):
+            if c2.form_submit_button("Annuler", use_container_width=True):
                 del st.session_state["editing_idx"]
                 st.rerun()
 
@@ -274,7 +272,7 @@ with tab_actifs:
                 flash("Actif supprimé")
                 del st.session_state["deleting_idx"]
                 st.rerun()
-            if c2.button("Annuler", key=f"cancel_del_{idx}", width="stretch"):
+            if c2.button("Annuler", key=f"cancel_del_{idx}", use_container_width=True):
                 del st.session_state["deleting_idx"]
                 st.rerun()
 
@@ -298,7 +296,7 @@ with tab_actifs:
             **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
             showlegend=False,
         )
-        st.plotly_chart(fig_pie, width="stretch", config={"staticPlot": True})
+        st.plotly_chart(fig_pie, use_container_width=True, config={"staticPlot": True})
 
 
 # ── Tab Historique ────────────────────────────────────────────────────────────
@@ -396,4 +394,4 @@ with tab_historique:
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
                             bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
             )
-            st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
+            st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})

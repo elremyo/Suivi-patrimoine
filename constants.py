@@ -13,7 +13,7 @@ CATEGORIES_AUTO = {"Actions & Fonds", "Crypto"}
 CATEGORIES_MANUAL = {"Livrets", "Immobilier", "Fonds euros"}
 
 CATEGORY_COLORS = [
-    "#4C9BE8", "#36C28A", "#F5A623", "#E8547A", "#A78BFA",
+    "#A4E84C", "#85357d", "#486df0", "#6f50e5", "#A78BFA",
 ]
 
 PLOTLY_LAYOUT = dict(
@@ -48,4 +48,4 @@ PERIOD_OPTIONS = {
     "Max": ("max", None),
 }
 
-PERIOD_DEFAULT = "6M"
+PERIOD_DEFAULT = "3M"
