@@ -58,6 +58,7 @@ with st.sidebar:
     with st.form("add_asset", clear_on_submit=True):
         if is_auto:
             ticker = st.text_input("Ticker *", placeholder="ex. AAPL, BTC-USD, CW8.PA")
+            ticker = ticker.strip().upper()
             quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
             pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
                                   help="Prix de Revient Unitaire.")
@@ -213,6 +214,7 @@ with tab_actifs:
                               help="Nom récupéré automatiquement depuis yfinance.")
                 ticker = st.text_input("Ticker *", value=ticker_current,
                                        placeholder="ex. AAPL, BTC-USD, CW8.PA")
+                ticker = ticker.strip().upper()
                 quantite = st.number_input("Quantité", min_value=0.0,
                                            value=float(quantite_current), step=1.0, format="%g")
                 pru = st.number_input("PRU (€)", min_value=0.0,
