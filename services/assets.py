@@ -17,7 +17,12 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
         [[asset_id, nom, categorie, montant, ticker, quantite, pru]],
         columns=df.columns
     )
-    df = pd.concat([df, new_row], ignore_index=True)
+    # Évite le FutureWarning pandas : concat avec un DataFrame vide
+    # se comportera différemment dans les prochaines versions
+    if df.empty:
+        df = new_row.reset_index(drop=True)
+    else:
+        df = pd.concat([df, new_row], ignore_index=True)
     save_assets(df)
     return df
 

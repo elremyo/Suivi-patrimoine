@@ -36,7 +36,12 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
         df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
 
     new_row = pd.DataFrame([[asset_id, d, montant]], columns=COLUMNS)
-    df = pd.concat([df, new_row], ignore_index=True)
+    # Évite le FutureWarning pandas : concat avec un DataFrame vide
+    # se comportera différemment dans les prochaines versions
+    if df.empty:
+        df = new_row.reset_index(drop=True)
+    else:
+        df = pd.concat([df, new_row], ignore_index=True)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
     safe_write_csv(df, HISTORIQUE_PATH)

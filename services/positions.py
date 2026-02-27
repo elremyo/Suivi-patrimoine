@@ -35,7 +35,12 @@ def record_position(asset_id: str, quantite: float, record_date: date | None = N
         df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
 
     new_row = pd.DataFrame([[asset_id, d, quantite]], columns=COLUMNS)
-    df = pd.concat([df, new_row], ignore_index=True)
+    # Évite le FutureWarning pandas : concat avec un DataFrame vide
+    # se comportera différemment dans les prochaines versions
+    if df.empty:
+        df = new_row.reset_index(drop=True)
+    else:
+        df = pd.concat([df, new_row], ignore_index=True)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
     safe_write_csv(df, POSITIONS_PATH)
