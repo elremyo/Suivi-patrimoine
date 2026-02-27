@@ -1,18 +1,17 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from services.storage import init_storage, download_assets, save_assets
-from services.assets import (
-    get_assets, add_asset, update_asset, delete_asset,
-    compute_total, compute_by_category,
+from services.storage import init_storage, download_assets
+from services.assets import compute_total, compute_by_category
+from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
+from services.positions import init_positions, load_positions
+from services.pricer import fetch_historical_prices
+from services.asset_manager import (
+    create_auto_asset, create_manual_asset,
+    edit_auto_asset, edit_manual_asset,
+    remove_asset, refresh_prices,
 )
-from services.historique import (
-    init_historique, load_historique, record_montant, delete_asset_history,
-    build_total_evolution, build_category_evolution, build_asset_evolution,
-)
-from services.positions import init_positions, load_positions, record_position, delete_asset_positions
-from services.pricer import refresh_auto_assets, get_name, fetch_historical_prices
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLORS, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
 
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
@@ -27,6 +26,7 @@ init_positions()
 
 @st.cache_data(show_spinner=False)
 def cached_load_assets() -> pd.DataFrame:
+    from services.assets import get_assets
     return get_assets()
 
 
@@ -103,13 +103,8 @@ with st.sidebar:
             quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
             pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
                                   help="Prix de Revient Unitaire.")
-            nom = ""
-            montant = 0.0
         else:
             nom = st.text_input("Nom *")
-            ticker = ""
-            quantite = 0.0
-            pru = 0.0
             montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
 
         if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
@@ -120,23 +115,10 @@ with st.sidebar:
             else:
                 if is_auto:
                     with st.spinner("Récupération du nom et du prix…"):
-                        nom = get_name(ticker)
-                        df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
-                        asset_id = df.iloc[-1]["id"]
-                        record_position(asset_id, quantite)
-                        df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-                        save_assets(df)
-                    if errors:
-                        flash(f"Actif ajouté ({nom}), mais ticker introuvable : {', '.join(errors)}", type="warning")
-                    else:
-                        flash(f"Actif ajouté et prix synchronisé ({nom})")
+                        df, msg, msg_type = create_auto_asset(df, ticker, quantite, pru, categorie)
                 else:
-                    df = add_asset(df, nom, categorie, montant, ticker, quantite, pru)
-                    asset_id = df.iloc[-1]["id"]
-                    record_montant(asset_id, montant)
-                    flash("Actif ajouté")
-                # ✅ Invalide le cache avant le rerun pour que les nouvelles
-                # données soient lues au prochain chargement
+                    df, msg, msg_type = create_manual_asset(df, nom, categorie, montant)
+                flash(msg, msg_type)
                 invalidate_data_cache()
                 st.rerun()
 
@@ -153,15 +135,10 @@ with st.sidebar:
         and (df["ticker"] != "").any()
     )
 
-    if st.button("🔄 Actualiser les prix", disabled=not has_auto_assets,
-                 width="stretch"):
+    if st.button("🔄 Actualiser les prix", disabled=not has_auto_assets, width="stretch"):
         with st.spinner("Récupération des prix…"):
-            df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-            save_assets(df)
-        if errors:
-            flash(f"Tickers introuvables : {', '.join(errors)}", type="warning")
-        else:
-            flash("Prix mis à jour")
+            df, msg, msg_type = refresh_prices(df)
+        flash(msg, msg_type)
         # ✅ Invalide le cache : les prix ont été mis à jour sur le disque
         invalidate_data_cache()
         st.rerun()
@@ -194,11 +171,10 @@ with tab_actifs:
     # Refresh automatique au premier chargement de la session
     if "prices_refreshed" not in st.session_state and has_auto_assets:
         with st.spinner("Actualisation des prix en cours…"):
-            df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-            save_assets(df)
+            df, msg, msg_type = refresh_prices(df)
         st.session_state["prices_refreshed"] = True
-        if errors:
-            flash(f"Tickers introuvables : {', '.join(errors)}", type="warning")
+        if msg_type != "success":
+            flash(msg, msg_type)
         # ✅ Invalide le cache : les prix viennent d'être rafraîchis
         invalidate_data_cache()
         st.rerun()
@@ -235,13 +211,14 @@ with tab_actifs:
                 else:
                     cols[3].write("--")
 
-                # ✅ On stocke l'UUID stable, pas l'index pandas qui peut changer
+                # ✅ On stocke l'UUID stable, pas l'index pandas qui peut changer (Action 1)
                 if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_id"] = row["id"]
                 if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
                     st.session_state["deleting_id"] = row["id"]
 
     if "editing_id" in st.session_state:
+        # ✅ On retrouve la ligne par UUID, pas par index (Action 1)
         try:
             idx, row = find_row_by_id(df, st.session_state["editing_id"])
         except ValueError as e:
@@ -272,13 +249,9 @@ with tab_actifs:
                                                value=float(quantite_current), step=1.0, format="%g")
                     pru = st.number_input("PRU (€)", min_value=0.0,
                                           value=float(pru_current), step=1.0, format="%g")
-                    montant = float(row["montant"])
                     nom = row["nom"]
                 else:
                     nom = st.text_input("Nom *", value=row["nom"])
-                    ticker = ""
-                    quantite = 0.0
-                    pru = 0.0
                     montant = st.number_input("Montant (€)", min_value=0.0,
                                               value=float(row["montant"]), step=100.0)
                 categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
@@ -292,21 +265,18 @@ with tab_actifs:
                         st.warning("Le nom est obligatoire.")
                     else:
                         if is_auto_edit:
-                            new_nom = get_name(ticker) if ticker != ticker_current else row["nom"]
                             with st.spinner("Synchronisation du prix…"):
-                                df = update_asset(df, idx, new_nom, categorie_edit, montant, ticker, quantite, pru)
-                                if quantite != quantite_current:
-                                    record_position(row["id"], quantite)
-                                df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-                                save_assets(df)
-                            if errors:
-                                flash(f"Actif modifié, mais ticker introuvable : {', '.join(errors)}", type="warning")
-                            else:
-                                flash("Actif modifié et prix synchronisé")
+                                df, msg, msg_type = edit_auto_asset(
+                                    df, idx, row["id"],
+                                    ticker, ticker_current,
+                                    quantite, quantite_current,
+                                    pru, categorie_edit,
+                                )
                         else:
-                            df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
-                            record_montant(row["id"], montant)
-                            flash("Actif modifié")
+                            df, msg, msg_type = edit_manual_asset(
+                                df, idx, row["id"], nom, categorie_edit, montant
+                            )
+                        flash(msg, msg_type)
                         del st.session_state["editing_id"]
                         # ✅ Invalide le cache : l'actif vient d'être modifié
                         invalidate_data_cache()
@@ -316,6 +286,7 @@ with tab_actifs:
                     st.rerun()
 
     if "deleting_id" in st.session_state:
+        # ✅ On retrouve la ligne par UUID, pas par index (Action 1)
         try:
             idx, row = find_row_by_id(df, st.session_state["deleting_id"])
         except ValueError as e:
@@ -327,10 +298,8 @@ with tab_actifs:
                 st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
                 c1, c2 = st.columns(2)
                 if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
-                    delete_asset_history(row["id"])
-                    delete_asset_positions(row["id"])
-                    df = delete_asset(df, idx)
-                    flash("Actif supprimé")
+                    df, msg, msg_type = remove_asset(df, idx, row["id"])
+                    flash(msg, msg_type)
                     del st.session_state["deleting_id"]
                     # ✅ Invalide le cache : un actif vient d'être supprimé
                     invalidate_data_cache()
