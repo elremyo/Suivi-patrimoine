@@ -44,6 +44,20 @@ def show_flash():
             st.toast(f["msg"], icon="ℹ️")
 
 
+def find_row_by_id(df: pd.DataFrame, asset_id: str):
+    """
+    Retourne (idx, row) pour l'actif correspondant à asset_id.
+    Lève une ValueError si l'actif n'est pas trouvé.
+    Utiliser l'UUID plutôt que l'index pandas évite de cibler le mauvais actif
+    après un reset_index ou une suppression.
+    """
+    matches = df[df["id"] == asset_id]
+    if matches.empty:
+        raise ValueError(f"Actif introuvable (id={asset_id}). Il a peut-être déjà été supprimé.")
+    idx = matches.index[0]
+    return idx, matches.iloc[0]
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -187,95 +201,107 @@ with tab_actifs:
                 else:
                     cols[3].write("--")
 
+                # ✅ On stocke l'UUID stable, pas l'index pandas qui peut changer
                 if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
-                    st.session_state["editing_idx"] = idx
+                    st.session_state["editing_id"] = row["id"]
                 if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
-                    st.session_state["deleting_idx"] = idx
+                    st.session_state["deleting_id"] = row["id"]
 
-    if "editing_idx" in st.session_state:
-        idx = st.session_state["editing_idx"]
-        row = df.loc[idx]
-        ticker_current = row.get("ticker", "")
-        if pd.isna(ticker_current):
-            ticker_current = ""
-        quantite_current = row.get("quantite", 0.0)
-        if pd.isna(quantite_current):
-            quantite_current = 0.0
-        pru_current = row.get("pru", 0.0)
-        if pd.isna(pru_current):
-            pru_current = 0.0
+    if "editing_id" in st.session_state:
+        # ✅ On retrouve la ligne par UUID, pas par index
+        try:
+            idx, row = find_row_by_id(df, st.session_state["editing_id"])
+        except ValueError as e:
+            st.error(str(e))
+            del st.session_state["editing_id"]
+            st.rerun()
+        else:
+            ticker_current = row.get("ticker", "")
+            if pd.isna(ticker_current):
+                ticker_current = ""
+            quantite_current = row.get("quantite", 0.0)
+            if pd.isna(quantite_current):
+                quantite_current = 0.0
+            pru_current = row.get("pru", 0.0)
+            if pd.isna(pru_current):
+                pru_current = 0.0
 
-        is_auto_edit = row["categorie"] in CATEGORIES_AUTO
+            is_auto_edit = row["categorie"] in CATEGORIES_AUTO
 
-        with st.form("edit_asset"):
-            if is_auto_edit:
-                st.text_input("Nom", value=row["nom"], disabled=True,
-                              help="Nom récupéré automatiquement depuis yfinance.")
-                ticker = st.text_input("Ticker *", value=ticker_current,
-                                       placeholder="ex. AAPL, BTC-USD, CW8.PA")
-                ticker = ticker.strip().upper()
-                quantite = st.number_input("Quantité", min_value=0.0,
-                                           value=float(quantite_current), step=1.0, format="%g")
-                pru = st.number_input("PRU (€)", min_value=0.0,
-                                      value=float(pru_current), step=1.0, format="%g")
-                montant = float(row["montant"])
-                nom = row["nom"]
-            else:
-                nom = st.text_input("Nom *", value=row["nom"])
-                ticker = ""
-                quantite = 0.0
-                pru = 0.0
-                montant = st.number_input("Montant (€)", min_value=0.0,
-                                          value=float(row["montant"]), step=100.0)
-            categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
-                                          index=CATEGORIES_ASSETS.index(row["categorie"]))
-
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-                if is_auto_edit and not ticker:
-                    st.warning("Le ticker est obligatoire.")
-                elif not is_auto_edit and not nom:
-                    st.warning("Le nom est obligatoire.")
+            with st.form("edit_asset"):
+                if is_auto_edit:
+                    st.text_input("Nom", value=row["nom"], disabled=True,
+                                  help="Nom récupéré automatiquement depuis yfinance.")
+                    ticker = st.text_input("Ticker *", value=ticker_current,
+                                           placeholder="ex. AAPL, BTC-USD, CW8.PA")
+                    ticker = ticker.strip().upper()
+                    quantite = st.number_input("Quantité", min_value=0.0,
+                                               value=float(quantite_current), step=1.0, format="%g")
+                    pru = st.number_input("PRU (€)", min_value=0.0,
+                                          value=float(pru_current), step=1.0, format="%g")
+                    montant = float(row["montant"])
+                    nom = row["nom"]
                 else:
-                    if is_auto_edit:
-                        new_nom = get_name(ticker) if ticker != ticker_current else row["nom"]
-                        with st.spinner("Synchronisation du prix…"):
-                            df = update_asset(df, idx, new_nom, categorie_edit, montant, ticker, quantite, pru)
-                            if quantite != quantite_current:
-                                record_position(row["id"], quantite)
-                            df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
-                            save_assets(df)
-                        if errors:
-                            flash(f"Actif modifié, mais ticker introuvable : {', '.join(errors)}", type="warning")
-                        else:
-                            flash("Actif modifié et prix synchronisé")
+                    nom = st.text_input("Nom *", value=row["nom"])
+                    ticker = ""
+                    quantite = 0.0
+                    pru = 0.0
+                    montant = st.number_input("Montant (€)", min_value=0.0,
+                                              value=float(row["montant"]), step=100.0)
+                categorie_edit = st.selectbox("Catégorie", options=CATEGORIES_ASSETS,
+                                              index=CATEGORIES_ASSETS.index(row["categorie"]))
+
+                c1, c2 = st.columns(2)
+                if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
+                    if is_auto_edit and not ticker:
+                        st.warning("Le ticker est obligatoire.")
+                    elif not is_auto_edit and not nom:
+                        st.warning("Le nom est obligatoire.")
                     else:
-                        df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
-                        record_montant(row["id"], montant)
-                        flash("Actif modifié")
-                    del st.session_state["editing_idx"]
+                        if is_auto_edit:
+                            new_nom = get_name(ticker) if ticker != ticker_current else row["nom"]
+                            with st.spinner("Synchronisation du prix…"):
+                                df = update_asset(df, idx, new_nom, categorie_edit, montant, ticker, quantite, pru)
+                                if quantite != quantite_current:
+                                    record_position(row["id"], quantite)
+                                df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+                                save_assets(df)
+                            if errors:
+                                flash(f"Actif modifié, mais ticker introuvable : {', '.join(errors)}", type="warning")
+                            else:
+                                flash("Actif modifié et prix synchronisé")
+                        else:
+                            df = update_asset(df, idx, nom, categorie_edit, montant, ticker, quantite, pru)
+                            record_montant(row["id"], montant)
+                            flash("Actif modifié")
+                        del st.session_state["editing_id"]
+                        st.rerun()
+                if c2.form_submit_button("Annuler", width="stretch"):
+                    del st.session_state["editing_id"]
                     st.rerun()
-            if c2.form_submit_button("Annuler", width="stretch"):
-                del st.session_state["editing_idx"]
-                st.rerun()
 
-    if "deleting_idx" in st.session_state:
-        idx = st.session_state["deleting_idx"]
-        row = df.loc[idx]
-
-        with st.container(border=True):
-            st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
-            c1, c2 = st.columns(2)
-            if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
-                delete_asset_history(row["id"])
-                delete_asset_positions(row["id"])
-                df = delete_asset(df, idx)
-                flash("Actif supprimé")
-                del st.session_state["deleting_idx"]
-                st.rerun()
-            if c2.button("Annuler", key=f"cancel_del_{idx}", width="stretch"):
-                del st.session_state["deleting_idx"]
-                st.rerun()
+    if "deleting_id" in st.session_state:
+        # ✅ On retrouve la ligne par UUID, pas par index
+        try:
+            idx, row = find_row_by_id(df, st.session_state["deleting_id"])
+        except ValueError as e:
+            st.error(str(e))
+            del st.session_state["deleting_id"]
+            st.rerun()
+        else:
+            with st.container(border=True):
+                st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
+                c1, c2 = st.columns(2)
+                if c1.button("Confirmer", key=f"confirm_del_{idx}", type="primary", use_container_width=True):
+                    delete_asset_history(row["id"])
+                    delete_asset_positions(row["id"])
+                    df = delete_asset(df, idx)
+                    flash("Actif supprimé")
+                    del st.session_state["deleting_id"]
+                    st.rerun()
+                if c2.button("Annuler", key=f"cancel_del_{idx}", width="stretch"):
+                    del st.session_state["deleting_id"]
+                    st.rerun()
 
     st.space(size="small")
 
