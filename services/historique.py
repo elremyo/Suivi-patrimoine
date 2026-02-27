@@ -4,6 +4,7 @@ from datetime import date
 from pandas.errors import EmptyDataError
 from constants import HISTORIQUE_PATH
 from services.storage import safe_write_csv
+from services.positions import get_quantity_at
 
 COLUMNS = ["asset_id", "date", "montant"]
 
@@ -229,7 +230,6 @@ def _auto_value_at(
     df_prices: pd.DataFrame,
 ) -> float | None:
     """Calcule la valeur d'un actif auto à une date : prix × quantité connue."""
-    from services.positions import get_quantity_at
 
     ticker = asset["ticker"]
     quantite = get_quantity_at(asset["id"], at_date, df_positions)
