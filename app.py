@@ -179,14 +179,13 @@ with tab_actifs:
                     valeur_achat = row["pru"] * row["quantite"]
                     pnl = row["montant"] - valeur_achat
                     pnl_pct = (pnl / valeur_achat * 100) if valeur_achat else 0
-                    color = "#36C28A" if pnl >= 0 else "#E8547A"
+                    color = "green" if pnl >= 0 else "red"
                     sign = "+" if pnl >= 0 else ""
+                    icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
                     cols[3].markdown(
-                        f"<span style='color:{color}'>{sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)</span>",
-                        unsafe_allow_html=True,
-                    )
+                        f":{color}-badge[{icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
                 else:
-                    cols[3].write("")
+                    cols[3].write("--")
 
                 if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
                     st.session_state["editing_idx"] = idx
@@ -278,10 +277,12 @@ with tab_actifs:
                 del st.session_state["deleting_idx"]
                 st.rerun()
 
-    st.divider()
+    st.space(size="small")
 
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+
+    st.space(size="small")
 
     stats = compute_by_category(df)
     if not stats.empty:
