@@ -20,9 +20,36 @@ init_storage()
 init_historique()
 init_positions()
 
-df = get_assets()
-df_hist = load_historique()
-df_positions = load_positions()
+
+# ── Cache des lectures CSV ────────────────────────────────────────────────────
+# Ces fonctions ne relisent le disque qu'une seule fois par session Streamlit.
+# Appeler invalidate_data_cache() après chaque écriture pour forcer un rechargement.
+
+@st.cache_data(show_spinner=False)
+def cached_load_assets() -> pd.DataFrame:
+    return get_assets()
+
+
+@st.cache_data(show_spinner=False)
+def cached_load_historique() -> pd.DataFrame:
+    return load_historique()
+
+
+@st.cache_data(show_spinner=False)
+def cached_load_positions() -> pd.DataFrame:
+    return load_positions()
+
+
+def invalidate_data_cache():
+    """Vide le cache des lectures CSV. À appeler après toute écriture sur le disque."""
+    cached_load_assets.clear()
+    cached_load_historique.clear()
+    cached_load_positions.clear()
+
+
+df = cached_load_assets()
+df_hist = cached_load_historique()
+df_positions = cached_load_positions()
 
 
 def flash(msg: str, type: str = "success"):
@@ -108,6 +135,9 @@ with st.sidebar:
                     asset_id = df.iloc[-1]["id"]
                     record_montant(asset_id, montant)
                     flash("Actif ajouté")
+                # ✅ Invalide le cache avant le rerun pour que les nouvelles
+                # données soient lues au prochain chargement
+                invalidate_data_cache()
                 st.rerun()
 
     show_flash()
@@ -132,6 +162,8 @@ with st.sidebar:
             flash(f"Tickers introuvables : {', '.join(errors)}", type="warning")
         else:
             flash("Prix mis à jour")
+        # ✅ Invalide le cache : les prix ont été mis à jour sur le disque
+        invalidate_data_cache()
         st.rerun()
 
     show_flash()
@@ -167,6 +199,8 @@ with tab_actifs:
         st.session_state["prices_refreshed"] = True
         if errors:
             flash(f"Tickers introuvables : {', '.join(errors)}", type="warning")
+        # ✅ Invalide le cache : les prix viennent d'être rafraîchis
+        invalidate_data_cache()
         st.rerun()
 
     show_flash()
@@ -208,7 +242,6 @@ with tab_actifs:
                     st.session_state["deleting_id"] = row["id"]
 
     if "editing_id" in st.session_state:
-        # ✅ On retrouve la ligne par UUID, pas par index
         try:
             idx, row = find_row_by_id(df, st.session_state["editing_id"])
         except ValueError as e:
@@ -275,13 +308,14 @@ with tab_actifs:
                             record_montant(row["id"], montant)
                             flash("Actif modifié")
                         del st.session_state["editing_id"]
+                        # ✅ Invalide le cache : l'actif vient d'être modifié
+                        invalidate_data_cache()
                         st.rerun()
                 if c2.form_submit_button("Annuler", width="stretch"):
                     del st.session_state["editing_id"]
                     st.rerun()
 
     if "deleting_id" in st.session_state:
-        # ✅ On retrouve la ligne par UUID, pas par index
         try:
             idx, row = find_row_by_id(df, st.session_state["deleting_id"])
         except ValueError as e:
@@ -298,6 +332,8 @@ with tab_actifs:
                     df = delete_asset(df, idx)
                     flash("Actif supprimé")
                     del st.session_state["deleting_id"]
+                    # ✅ Invalide le cache : un actif vient d'être supprimé
+                    invalidate_data_cache()
                     st.rerun()
                 if c2.button("Annuler", key=f"cancel_del_{idx}", width="stretch"):
                     del st.session_state["deleting_id"]
