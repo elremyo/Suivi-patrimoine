@@ -90,9 +90,8 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
 
     # Bouton de vérification
     if st.button(
-        "🔍 Vérifier le ticker",
+        "Vérifier le ticker",
         use_container_width=True,
-        disabled=not ticker_input,
         key="_form_verify_btn",
     ):
         valid, err = validate_ticker(ticker_input)
@@ -143,7 +142,11 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     )
 
     c1, c2 = st.columns(2)
-    if c1.button("💾 Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
+    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
+        _close_dialog()
+        st.rerun()
+
+    if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
         effective_ticker = ticker_result["ticker"]
         if mode == "create":
             with st.spinner("Ajout en cours…"):
@@ -161,10 +164,6 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         flash_fn(msg, msg_type)
         _close_dialog()
         invalidate_cache_fn()
-        st.rerun()
-
-    if c2.button("Annuler", use_container_width=True, key="_form_cancel"):
-        _close_dialog()
         st.rerun()
 
     return df
@@ -187,7 +186,11 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     )
 
     c1, c2 = st.columns(2)
-    if c1.button("💾 Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
+    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
+        _close_dialog()
+        st.rerun()
+
+    if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
         if not nom:
             st.warning("Le nom est obligatoire.")
         else:
@@ -200,7 +203,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
             invalidate_cache_fn()
             st.rerun()
 
-    if c2.button("Annuler", use_container_width=True, key="_form_cancel"):
+    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
         _close_dialog()
         st.rerun()
 
@@ -257,15 +260,16 @@ def _dialog_delete(df, asset_id, invalidate_cache_fn, flash_fn):
 
     st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
     c1, c2 = st.columns(2)
-    if c1.button("Confirmer", type="primary", use_container_width=True, key="_delete_confirm"):
+    if c1.button("Annuler", use_container_width=True, key="_delete_cancel"):
+        _close_dialog()
+        st.rerun()
+    if c2.button("Confirmer", type="primary", use_container_width=True, key="_delete_confirm"):
         df, msg, msg_type = remove_asset(df, idx, row["id"])
         flash_fn(msg, msg_type)
         _close_dialog()
         invalidate_cache_fn()
         st.rerun()
-    if c2.button("Annuler", use_container_width=True, key="_delete_cancel"):
-        _close_dialog()
-        st.rerun()
+
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────

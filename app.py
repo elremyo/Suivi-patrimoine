@@ -68,7 +68,7 @@ with st.sidebar:
     st.title("Suivi de patrimoine")
     st.divider()
 
-    if st.button("➕ Ajouter un actif", type="primary", use_container_width=True):
+    if st.button("Ajouter un actif", type="primary", use_container_width=True, icon=":material/add:"):
         set_dialog_create()
         st.rerun()
 
@@ -81,7 +81,7 @@ with st.sidebar:
         and (df["ticker"] != "").any()
     )
 
-    if st.button("🔄 Actualiser les prix", disabled=not has_auto_assets, use_container_width=True):
+    if st.button("Actualiser les prix", disabled=not has_auto_assets, use_container_width=True, icon=":material/refresh:"):
         with st.spinner("Récupération des prix…"):
             df, msg, msg_type = refresh_prices(df)
         flash(msg, msg_type)
@@ -91,11 +91,12 @@ with st.sidebar:
     st.divider()
 
     st.download_button(
-        "⬇️ Télécharger le patrimoine",
+        "Télécharger le patrimoine",
         data=download_assets(df),
         file_name="patrimoine.csv",
         mime="text/csv",
         use_container_width=True,
+        icon=":material/download:",
     )
 
     show_flash()
