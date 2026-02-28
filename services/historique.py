@@ -36,8 +36,6 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
         df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
 
     new_row = pd.DataFrame([[asset_id, d, montant]], columns=COLUMNS)
-    # Évite le FutureWarning pandas : concat avec un DataFrame vide
-    # se comportera différemment dans les prochaines versions
     if df.empty:
         df = new_row.reset_index(drop=True)
     else:
@@ -68,6 +66,8 @@ def get_montant_at(asset_id: str, at_date: pd.Timestamp, df_hist: pd.DataFrame) 
     return float(past.sort_values("date").iloc[-1]["montant"])
 
 
+# ── Fonctions publiques d'évolution ──────────────────────────────────────────
+
 def build_total_evolution(
     df_assets: pd.DataFrame,
     df_hist: pd.DataFrame,
@@ -76,42 +76,15 @@ def build_total_evolution(
     categories_auto: set,
 ) -> pd.DataFrame:
     """
-    Reconstruit la courbe d'évolution du patrimoine total en fusionnant :
-    - les actifs auto  : prix historiques yfinance × quantité connue à chaque date
-    - les actifs manuels : historique CSV (dernier montant connu à chaque date)
-
-    df_prices : DataFrame pivot date × ticker (prix de clôture historiques, depuis yfinance)
-    df_positions : journal des quantités (asset_id, date, quantite)
-
-    Retourne un DataFrame { date, total }.
+    Retourne un DataFrame { date, total } avec la valeur totale du patrimoine
+    pour chaque date disponible dans l'historique.
     """
-    if df_assets.empty:
+    raw = _compute_raw_evolution(df_assets, df_hist, df_positions, df_prices, categories_auto)
+    if raw.empty:
         return pd.DataFrame(columns=["date", "total"])
 
-    all_dates = _collect_all_dates(df_hist, df_prices)
-    if all_dates.empty:
-        return pd.DataFrame(columns=["date", "total"])
-
-    earliest = _earliest_known_date(df_hist, df_positions)
-    if earliest is not None:
-        all_dates = all_dates[all_dates >= earliest]
-
-    records = []
-    for d in all_dates:
-        total = 0.0
-        has_value = False
-        for _, asset in df_assets.iterrows():
-            if asset["categorie"] in categories_auto and asset["ticker"]:
-                val = _auto_value_at(asset, d, df_positions, df_prices)
-            else:
-                val = get_montant_at(asset["id"], d, df_hist)
-            if val is not None:
-                total += val
-                has_value = True
-        if has_value:
-            records.append({"date": d, "total": total})
-
-    result = pd.DataFrame(records)
+    result = raw.groupby("date")["valeur"].sum().reset_index()
+    result.columns = ["date", "total"]
     return result.sort_values("date").reset_index(drop=True)
 
 
@@ -123,40 +96,16 @@ def build_category_evolution(
     categories_auto: set,
 ) -> pd.DataFrame:
     """
-    Même logique que build_total_evolution mais retourne un pivot date × catégorie.
+    Retourne un DataFrame pivot date × catégorie avec la valeur de chaque catégorie
+    pour chaque date disponible dans l'historique.
     """
-    if df_assets.empty:
+    raw = _compute_raw_evolution(df_assets, df_hist, df_positions, df_prices, categories_auto)
+    if raw.empty:
         return pd.DataFrame()
 
-    all_dates = _collect_all_dates(df_hist, df_prices)
-    if all_dates.empty:
-        return pd.DataFrame()
-
-    earliest = _earliest_known_date(df_hist, df_positions)
-    if earliest is not None:
-        all_dates = all_dates[all_dates >= earliest]
-
-    records = []
-    for d in all_dates:
-        row = {"date": d}
-        has_value = False
-        for cat in df_assets["categorie"].unique():
-            cat_assets = df_assets[df_assets["categorie"] == cat]
-            total_cat = 0.0
-            for _, asset in cat_assets.iterrows():
-                if asset["categorie"] in categories_auto and asset["ticker"]:
-                    val = _auto_value_at(asset, d, df_positions, df_prices)
-                else:
-                    val = get_montant_at(asset["id"], d, df_hist)
-                if val is not None:
-                    total_cat += val
-                    has_value = True
-            row[cat] = total_cat
-        if has_value:
-            records.append(row)
-
-    pivot = pd.DataFrame(records).set_index("date").sort_index()
-    return pivot
+    pivot = raw.groupby(["date", "categorie"])["valeur"].sum().unstack(fill_value=0)
+    pivot.index = pd.to_datetime(pivot.index)
+    return pivot.sort_index()
 
 
 def build_asset_evolution(
@@ -167,8 +116,35 @@ def build_asset_evolution(
     categories_auto: set,
 ) -> pd.DataFrame:
     """
-    Même logique que build_category_evolution mais retourne un pivot date × nom d'actif.
-    La colonne est le nom de l'actif (pas l'id).
+    Retourne un DataFrame pivot date × nom d'actif avec la valeur de chaque actif
+    pour chaque date disponible dans l'historique.
+    """
+    raw = _compute_raw_evolution(df_assets, df_hist, df_positions, df_prices, categories_auto)
+    if raw.empty:
+        return pd.DataFrame()
+
+    pivot = raw.groupby(["date", "nom"])["valeur"].sum().unstack(fill_value=0)
+    pivot.index = pd.to_datetime(pivot.index)
+    return pivot.sort_index()
+
+
+# ── Cœur du calcul — fonction privée ─────────────────────────────────────────
+
+def _compute_raw_evolution(
+    df_assets: pd.DataFrame,
+    df_hist: pd.DataFrame,
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+    categories_auto: set,
+) -> pd.DataFrame:
+    """
+    Calcule la valeur de chaque actif à chaque date disponible.
+
+    Retourne un DataFrame à format long :
+        date | asset_id | nom | categorie | valeur
+
+    C'est la source unique utilisée par build_total_evolution,
+    build_category_evolution et build_asset_evolution.
     """
     if df_assets.empty:
         return pd.DataFrame()
@@ -183,23 +159,22 @@ def build_asset_evolution(
 
     records = []
     for d in all_dates:
-        row = {"date": d}
-        has_value = False
         for _, asset in df_assets.iterrows():
             if asset["categorie"] in categories_auto and asset["ticker"]:
                 val = _auto_value_at(asset, d, df_positions, df_prices)
             else:
                 val = get_montant_at(asset["id"], d, df_hist)
-            if val is not None:
-                row[asset["nom"]] = val
-                has_value = True
-            else:
-                row[asset["nom"]] = 0.0
-        if has_value:
-            records.append(row)
 
-    pivot = pd.DataFrame(records).set_index("date").sort_index()
-    return pivot
+            if val is not None:
+                records.append({
+                    "date":      d,
+                    "asset_id":  asset["id"],
+                    "nom":       asset["nom"],
+                    "categorie": asset["categorie"],
+                    "valeur":    val,
+                })
+
+    return pd.DataFrame(records)
 
 
 # ── Helpers privés ────────────────────────────────────────────────────────────
@@ -235,7 +210,6 @@ def _auto_value_at(
     df_prices: pd.DataFrame,
 ) -> float | None:
     """Calcule la valeur d'un actif auto à une date : prix × quantité connue."""
-
     ticker = asset["ticker"]
     quantite = get_quantity_at(asset["id"], at_date, df_positions)
     if quantite is None:
@@ -249,5 +223,4 @@ def _auto_value_at(
     if past_prices.empty:
         return None
 
-    price = float(past_prices.iloc[-1])
-    return round(price * quantite, 2)
+    return round(float(past_prices.iloc[-1]) * quantite, 2)
