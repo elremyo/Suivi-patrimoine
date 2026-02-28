@@ -1,6 +1,6 @@
 import uuid
 import pandas as pd
-from services.storage import load_assets, save_assets
+from services.storage import load_assets
 
 
 def get_assets() -> pd.DataFrame:
@@ -23,7 +23,6 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
         df = new_row.reset_index(drop=True)
     else:
         df = pd.concat([df, new_row], ignore_index=True)
-    save_assets(df)
     return df
 
 
@@ -35,13 +34,11 @@ def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: 
     df.loc[idx, "ticker"] = ticker
     df.loc[idx, "quantite"] = quantite
     df.loc[idx, "pru"] = pru
-    save_assets(df)
     return df
 
 
 def delete_asset(df: pd.DataFrame, idx: int) -> pd.DataFrame:
     df = df.drop(index=idx).reset_index(drop=True)
-    save_assets(df)
     return df
 
 
