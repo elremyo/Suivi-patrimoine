@@ -15,7 +15,7 @@ import pandas as pd
 from services.assets import add_asset, update_asset, delete_asset
 from services.historique import record_montant, delete_asset_history
 from services.positions import record_position, delete_asset_positions
-from services.pricer import get_name, refresh_auto_assets, get_prices_bulk
+from services.pricer import get_name, refresh_auto_assets, validate_ticker
 from services.storage import save_assets
 from constants import CATEGORIES_AUTO
 
@@ -31,12 +31,17 @@ def create_auto_asset(
 ) -> tuple[pd.DataFrame, str, str]:
     """
     Crée un actif automatique (Actions & Fonds, Crypto) :
-    1. Récupère le nom depuis yfinance
-    2. Ajoute l'actif au DataFrame
-    3. Enregistre la position initiale
-    4. Rafraîchit le prix
-    5. Sauvegarde sur le disque
+    1. Valide le format du ticker
+    2. Récupère le nom depuis yfinance
+    3. Ajoute l'actif au DataFrame
+    4. Enregistre la position initiale
+    5. Rafraîchit le prix
+    6. Sauvegarde sur le disque
     """
+    valid, err = validate_ticker(ticker)
+    if not valid:
+        return df, err, "error"
+
     nom = get_name(ticker)
     df = add_asset(df, nom, categorie, montant=0.0, ticker=ticker, quantite=quantite, pru=pru)
     asset_id = df.iloc[-1]["id"]
@@ -84,12 +89,17 @@ def edit_auto_asset(
 ) -> tuple[pd.DataFrame, str, str]:
     """
     Modifie un actif automatique :
-    1. Récupère le nouveau nom si le ticker a changé
-    2. Met à jour l'actif
-    3. Enregistre une nouvelle position si la quantité a changé
-    4. Rafraîchit le prix
-    5. Sauvegarde sur le disque
+    1. Valide le format du ticker
+    2. Récupère le nouveau nom si le ticker a changé
+    3. Met à jour l'actif
+    4. Enregistre une nouvelle position si la quantité a changé
+    5. Rafraîchit le prix
+    6. Sauvegarde sur le disque
     """
+    valid, err = validate_ticker(ticker)
+    if not valid:
+        return df, err, "error"
+
     nom = get_name(ticker) if ticker != ticker_current else df.loc[idx, "nom"]
     montant = float(df.loc[idx, "montant"])
 

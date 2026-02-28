@@ -1,7 +1,24 @@
+import re
 import yfinance as yf
 import pandas as pd
 import streamlit as st
 from constants import CACHE_TTL_SECONDS, PERIOD_OPTIONS, PERIOD_DEFAULT
+
+# Ticker valide : lettres, chiffres, tirets, points, carets — 1 à 20 caractères
+# Exemples valides : AAPL, BTC-USD, CW8.PA, ^FCHI
+_TICKER_PATTERN = re.compile(r"^[A-Z0-9\.\-\^]{1,20}$")
+
+
+def validate_ticker(ticker: str) -> tuple[bool, str]:
+    """
+    Vérifie que le ticker a un format acceptable avant d'appeler yfinance.
+    Retourne (True, "") si valide, (False, message_erreur) sinon.
+    """
+    if not ticker:
+        return False, "Le ticker ne peut pas être vide."
+    if not _TICKER_PATTERN.match(ticker):
+        return False, f"Ticker invalide : « {ticker} ». Utilisez uniquement des lettres, chiffres, tirets ou points (ex. AAPL, BTC-USD, CW8.PA)."
+    return True, ""
 
 
 def get_price(ticker: str) -> float | None:
