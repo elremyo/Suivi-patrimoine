@@ -21,6 +21,29 @@ def validate_ticker(ticker: str) -> tuple[bool, str]:
     return True, ""
 
 
+def lookup_ticker(ticker: str) -> dict | None:
+    """
+    Interroge yfinance pour valider l'existence d'un ticker et récupérer ses infos.
+    Retourne un dict {ticker, name, price, currency} ou None si introuvable.
+    """
+    try:
+        t = yf.Ticker(ticker)
+        price = t.fast_info.last_price
+        if not price or price <= 0:
+            return None
+        info = t.info
+        name = info.get("longName") or info.get("shortName") or ticker
+        currency = info.get("currency") or ""
+        return {
+            "ticker": ticker,
+            "name": name,
+            "price": round(price, 4),
+            "currency": currency,
+        }
+    except Exception:
+        return None
+
+
 def get_price(ticker: str) -> float | None:
     """
     Retourne le dernier prix connu pour un ticker yfinance.
@@ -79,10 +102,6 @@ def fetch_historical_prices(tickers: tuple, period: str = PERIOD_OPTIONS[PERIOD_
     """
     Récupère les prix de clôture historiques pour une liste de tickers.
     Retourne un DataFrame pivot date × ticker.
-    period : "5d", "1mo", "3mo", "6mo", "1y", "max", etc.
-
-    Accepte un tuple (hashable) pour que @st.cache_data puisse construire la clé de cache.
-    Le cache est séparé par combinaison (tickers, period).
     """
     if not tickers:
         return pd.DataFrame()

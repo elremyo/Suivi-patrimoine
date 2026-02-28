@@ -2,14 +2,6 @@
 app.py
 ──────
 Point d'entrée de l'application Streamlit.
-Responsabilités limitées à :
-- Configuration et initialisation
-- Cache des lectures CSV
-- Sidebar (ajout d'actif, rafraîchissement des prix, export)
-- Routing vers les tabs (tab_actifs, tab_historique)
-
-Toute la logique métier est dans services/asset_manager.py.
-Tout le rendu des tabs est dans ui/tab_actifs.py et ui/tab_historique.py.
 """
 
 import streamlit as st
@@ -19,6 +11,7 @@ from services.assets import get_assets
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
 from services.positions import init_positions, load_positions
 from services.asset_manager import create_auto_asset, create_manual_asset, refresh_prices
+from services.pricer import validate_ticker, lookup_ticker
 from ui.tab_actifs import render as render_actifs
 from ui.tab_historique import render as render_historique
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO
@@ -31,8 +24,6 @@ init_positions()
 
 
 # ── Cache des lectures CSV ────────────────────────────────────────────────────
-# Ces fonctions ne relisent le disque qu'une seule fois par session Streamlit.
-# Appeler invalidate_data_cache() après chaque écriture pour forcer un rechargement.
 
 @st.cache_data(show_spinner=False)
 def cached_load_assets() -> pd.DataFrame:
@@ -50,7 +41,6 @@ def cached_load_positions() -> pd.DataFrame:
 
 
 def invalidate_data_cache():
-    """Vide le cache des lectures CSV. À appeler après toute écriture sur le disque."""
     cached_load_assets.clear()
     cached_load_historique.clear()
     cached_load_positions.clear()
@@ -66,12 +56,10 @@ df_positions = cached_load_positions()
 # ── Utilitaires UI ────────────────────────────────────────────────────────────
 
 def flash(msg: str, type: str = "success"):
-    """Stocke un message à afficher après le prochain rerun."""
     st.session_state["_flash"] = {"msg": msg, "type": type}
 
 
 def show_flash():
-    """Affiche et consomme le message flash s'il existe."""
     if "_flash" in st.session_state:
         f = st.session_state.pop("_flash")
         icons = {"success": "✅", "warning": "⚠️", "error": "❌", "info": "ℹ️"}
@@ -86,34 +74,82 @@ with st.sidebar:
 
     st.subheader("Ajouter un actif")
 
-    categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS, key="add_categorie")
-    is_auto = categorie in CATEGORIES_AUTO
+    with st.container(border=True):
 
-    with st.form("add_asset", clear_on_submit=True):
+        categorie = st.selectbox("Catégorie", options=CATEGORIES_ASSETS, key="add_categorie")
+        is_auto = categorie in CATEGORIES_AUTO
+
+        # Si on change de catégorie, on réinitialise l'aperçu du ticker
+        if st.session_state.get("_last_add_categorie") != categorie:
+            st.session_state.pop("ticker_preview", None)
+            st.session_state["_last_add_categorie"] = categorie
+
         if is_auto:
-            ticker = st.text_input("Ticker *", placeholder="ex. AAPL, BTC-USD, CW8.PA").strip().upper()
-            quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g")
-            pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
-                                  help="Prix de Revient Unitaire.")
-        else:
-            nom = st.text_input("Nom *")
-            montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
+            # ── Étape 1 : saisie et vérification du ticker ────────────────────────
+            ticker_input = st.text_input(
+                "Ticker *",
+                placeholder="ex. AAPL, BTC-USD, CW8.PA",
+                key="add_ticker_input",
+            ).strip().upper()
 
-        if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
-            if is_auto and not ticker:
-                st.warning("Le ticker est obligatoire.")
-            elif not is_auto and not nom:
-                st.warning("Le nom est obligatoire.")
-            else:
-                if is_auto:
-                    with st.spinner("Récupération du nom et du prix…"):
-                        df, msg, msg_type = create_auto_asset(df, ticker, quantite, pru, categorie)
+            # Si le ticker saisi change, on efface l'aperçu précédent
+            if st.session_state.get("_last_ticker_input") != ticker_input:
+                st.session_state.pop("ticker_preview", None)
+                st.session_state["_last_ticker_input"] = ticker_input
+
+            if st.button("🔍 Vérifier le ticker", use_container_width=True):
+                valid, err = validate_ticker(ticker_input)
+                if not valid:
+                    st.error(err)
                 else:
-                    df, msg, msg_type = create_manual_asset(df, nom, categorie, montant)
-                flash(msg, msg_type)
-                # ✅ Invalide le cache avant le rerun (Action 2)
-                invalidate_data_cache()
-                st.rerun()
+                    with st.spinner("Recherche en cours…"):
+                        result = lookup_ticker(ticker_input)
+                    if result:
+                        st.session_state["ticker_preview"] = result
+                    else:
+                        st.error(f"Ticker « {ticker_input} » introuvable sur yfinance. Vérifiez l'orthographe.")
+
+            # ── Étape 2 : aperçu + confirmation ──────────────────────────────────
+            if "ticker_preview" in st.session_state:
+                preview = st.session_state["ticker_preview"]
+
+                with st.container(border=True):
+                    st.markdown(f"**{preview['name']}**")
+                    price_str = f"{preview['price']:,.4f} {preview['currency']}".strip()
+                    st.caption(f"{preview['ticker']} · {price_str}")
+
+                quantite = st.number_input("Quantité", min_value=0.0, step=1.0, format="%g", key="add_quantite")
+                pru = st.number_input("PRU (€)", min_value=0.0, step=1.0, format="%g",
+                                      help="Prix de Revient Unitaire.", key="add_pru")
+
+                c1, c2 = st.columns(2)
+                if c1.button("✅ Confirmer", type="primary", use_container_width=True):
+                    with st.spinner("Ajout en cours…"):
+                        df, msg, msg_type = create_auto_asset(
+                            df, preview["ticker"], quantite, pru, categorie
+                        )
+                    st.session_state.pop("ticker_preview", None)
+                    flash(msg, msg_type)
+                    invalidate_data_cache()
+                    st.rerun()
+                if c2.button("Annuler", use_container_width=True):
+                    st.session_state.pop("ticker_preview", None)
+                    st.rerun()
+
+        else:
+            # ── Actif manuel : formulaire classique ───────────────────────────────
+            with st.form("add_manual_asset", clear_on_submit=True):
+                nom = st.text_input("Nom *")
+                montant = st.number_input("Montant (€)", min_value=0.0, step=100.0)
+
+                if st.form_submit_button("Ajouter", type="primary", use_container_width=True):
+                    if not nom:
+                        st.warning("Le nom est obligatoire.")
+                    else:
+                        df, msg, msg_type = create_manual_asset(df, nom, categorie, montant)
+                        flash(msg, msg_type)
+                        invalidate_data_cache()
+                        st.rerun()
 
     show_flash()
 
@@ -132,7 +168,6 @@ with st.sidebar:
         with st.spinner("Récupération des prix…"):
             df, msg, msg_type = refresh_prices(df)
         flash(msg, msg_type)
-        # ✅ Invalide le cache : les prix ont été mis à jour sur le disque (Action 2)
         invalidate_data_cache()
         st.rerun()
 

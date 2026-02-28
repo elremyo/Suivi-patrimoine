@@ -3,8 +3,6 @@ ui/tab_actifs.py
 ───────────────────
 Contenu du tab "📋 Actifs" : liste des actifs, édition, suppression,
 total patrimoine et camembert de répartition.
-
-Point d'entrée unique : render(df, invalidate_cache_fn, flash_fn)
 """
 
 import streamlit as st
@@ -15,14 +13,11 @@ from services.asset_manager import (
     edit_auto_asset, edit_manual_asset,
     remove_asset, refresh_prices,
 )
+from services.pricer import validate_ticker, lookup_ticker
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
 
 
 def _find_row_by_id(df: pd.DataFrame, asset_id: str):
-    """
-    Retourne (idx, row) pour l'actif correspondant à asset_id.
-    Lève une ValueError si l'actif n'est pas trouvé.
-    """
     matches = df[df["id"] == asset_id]
     if matches.empty:
         raise ValueError(f"Actif introuvable (id={asset_id}). Il a peut-être déjà été supprimé.")
@@ -54,9 +49,10 @@ def _render_asset_row(df: pd.DataFrame, idx: int, row: pd.Series):
     else:
         cols[3].write("--")
 
-    # ✅ UUID stable — pas l'index pandas (Action 1)
     if cols[4].button("", key=f"mod_{idx}", icon=":material/edit_square:"):
         st.session_state["editing_id"] = row["id"]
+        # Réinitialise l'aperçu de vérification à chaque ouverture du formulaire
+        st.session_state.pop("edit_ticker_preview", None)
     if cols[5].button("", key=f"del_{idx}", icon=":material/delete:"):
         st.session_state["deleting_id"] = row["id"]
 
@@ -66,7 +62,6 @@ def _render_edit_form(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     if "editing_id" not in st.session_state:
         return df
 
-    # ✅ Recherche par UUID (Action 1)
     try:
         idx, row = _find_row_by_id(df, st.session_state["editing_id"])
     except ValueError as e:
@@ -81,68 +76,130 @@ def _render_edit_form(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     pru_current = float(row.get("pru") or 0.0)
     is_auto_edit = row["categorie"] in CATEGORIES_AUTO
 
-    with st.form("edit_asset"):
+    with st.container(border=True):
+        st.markdown(f"**Modifier — {row['nom']}**")
+
         if is_auto_edit:
-            st.text_input("Nom", value=row["nom"], disabled=True,
-                          help="Nom récupéré automatiquement depuis yfinance.")
-            ticker = st.text_input("Ticker *", value=ticker_current,
-                                   placeholder="ex. AAPL, BTC-USD, CW8.PA").strip().upper()
-            quantite = st.number_input("Quantité", min_value=0.0,
-                                       value=quantite_current, step=1.0, format="%g")
-            pru = st.number_input("PRU (€)", min_value=0.0,
-                                  value=pru_current, step=1.0, format="%g")
-            nom = row["nom"]
-        else:
-            nom = st.text_input("Nom *", value=row["nom"])
-            ticker = ""
-            quantite = 0.0
-            pru = 0.0
-            montant = st.number_input("Montant (€)", min_value=0.0,
-                                      value=float(row["montant"]), step=100.0)
+            # ── Étape 1 : saisie et vérification du ticker ────────────────
+            ticker_input = st.text_input(
+                "Ticker *",
+                value=ticker_current,
+                placeholder="ex. AAPL, BTC-USD, CW8.PA",
+                key="edit_ticker_input",
+            ).strip().upper()
 
-        categorie_edit = st.selectbox(
-            "Catégorie", options=CATEGORIES_ASSETS,
-            index=CATEGORIES_ASSETS.index(row["categorie"])
-        )
+            # Si le ticker change, on efface l'aperçu
+            if st.session_state.get("_last_edit_ticker") != ticker_input:
+                st.session_state.pop("edit_ticker_preview", None)
+                st.session_state["_last_edit_ticker"] = ticker_input
 
-        c1, c2 = st.columns(2)
-        if c1.form_submit_button("Sauvegarder", type="primary", use_container_width=True):
-            if is_auto_edit and not ticker:
-                st.warning("Le ticker est obligatoire.")
-            elif not is_auto_edit and not nom:
-                st.warning("Le nom est obligatoire.")
-            else:
-                if is_auto_edit:
+            # Si le ticker n'a pas changé, on pré-remplit l'aperçu avec les données actuelles
+            if "edit_ticker_preview" not in st.session_state and ticker_input == ticker_current:
+                st.session_state["edit_ticker_preview"] = {
+                    "ticker": ticker_current,
+                    "name": row["nom"],
+                    "price": float(row["montant"] / row["quantite"]) if row["quantite"] else 0.0,
+                    "currency": "",
+                    "prefilled": True,  # indique que c'est un pré-remplissage, pas une vraie vérif
+                }
+
+            if ticker_input != ticker_current:
+                if st.button("🔍 Vérifier le ticker", use_container_width=True, disabled=not ticker_input, key="edit_verify_btn"):
+                    valid, err = validate_ticker(ticker_input)
+                    if not valid:
+                        st.error(err)
+                    else:
+                        with st.spinner("Recherche en cours…"):
+                            result = lookup_ticker(ticker_input)
+                        if result:
+                            st.session_state["edit_ticker_preview"] = result
+                        else:
+                            st.error(f"Ticker « {ticker_input} » introuvable sur yfinance.")
+
+            # ── Étape 2 : aperçu + champs quantité/PRU ────────────────────
+            if "edit_ticker_preview" in st.session_state:
+                preview = st.session_state["edit_ticker_preview"]
+                is_prefilled = preview.get("prefilled", False)
+
+                if not is_prefilled:
+                    with st.container(border=True):
+                        st.markdown(f"**{preview['name']}**")
+                        price_str = f"{preview['price']:,.4f} {preview['currency']}".strip()
+                        st.caption(f"{preview['ticker']} · {price_str}")
+
+                quantite = st.number_input(
+                    "Quantité", min_value=0.0, value=quantite_current, step=1.0,
+                    format="%g", key="edit_quantite"
+                )
+                pru = st.number_input(
+                    "PRU (€)", min_value=0.0, value=pru_current, step=1.0,
+                    format="%g", key="edit_pru"
+                )
+                categorie_edit = st.selectbox(
+                    "Catégorie", options=CATEGORIES_ASSETS,
+                    index=CATEGORIES_ASSETS.index(row["categorie"]),
+                    key="edit_categorie"
+                )
+
+                c1, c2 = st.columns(2)
+                if c1.button("💾 Sauvegarder", type="primary", use_container_width=True, key="edit_save_btn"):
+                    effective_ticker = preview["ticker"]
                     with st.spinner("Synchronisation du prix…"):
                         df, msg, msg_type = edit_auto_asset(
                             df, idx, row["id"],
-                            ticker, ticker_current,
+                            effective_ticker, ticker_current,
                             quantite, quantite_current,
                             pru, categorie_edit,
                         )
-                else:
-                    df, msg, msg_type = edit_manual_asset(
-                        df, idx, row["id"], nom, categorie_edit, montant
-                    )
-                flash_fn(msg, msg_type)
-                del st.session_state["editing_id"]
-                # ✅ Invalide le cache : l'actif vient d'être modifié (Action 2)
-                invalidate_cache_fn()
-                st.rerun()
+                    flash_fn(msg, msg_type)
+                    del st.session_state["editing_id"]
+                    st.session_state.pop("edit_ticker_preview", None)
+                    invalidate_cache_fn()
+                    st.rerun()
+                if c2.button("Annuler", use_container_width=True, key="edit_cancel_btn"):
+                    del st.session_state["editing_id"]
+                    st.session_state.pop("edit_ticker_preview", None)
+                    st.rerun()
 
-        if c2.form_submit_button("Annuler", width="stretch"):
-            del st.session_state["editing_id"]
-            st.rerun()
+            elif ticker_input != ticker_current:
+                # Ticker changé mais pas encore vérifié → on désactive la sauvegarde
+                st.info("Vérifiez le nouveau ticker avant de sauvegarder.")
+
+        else:
+            # ── Actif manuel : formulaire classique ───────────────────────
+            with st.form("edit_manual_asset"):
+                nom = st.text_input("Nom *", value=row["nom"])
+                montant = st.number_input(
+                    "Montant (€)", min_value=0.0, value=float(row["montant"]), step=100.0
+                )
+                categorie_edit = st.selectbox(
+                    "Catégorie", options=CATEGORIES_ASSETS,
+                    index=CATEGORIES_ASSETS.index(row["categorie"])
+                )
+                c1, c2 = st.columns(2)
+                if c1.form_submit_button("💾 Sauvegarder", type="primary", use_container_width=True):
+                    if not nom:
+                        st.warning("Le nom est obligatoire.")
+                    else:
+                        df, msg, msg_type = edit_manual_asset(
+                            df, idx, row["id"], nom, categorie_edit, montant
+                        )
+                        flash_fn(msg, msg_type)
+                        del st.session_state["editing_id"]
+                        invalidate_cache_fn()
+                        st.rerun()
+                if c2.form_submit_button("Annuler", use_container_width=True):
+                    del st.session_state["editing_id"]
+                    st.rerun()
 
     return df
 
 
 def _render_delete_confirm(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
-    """Affiche la confirmation de suppression si un actif est en attente de suppression."""
+    """Affiche la confirmation de suppression."""
     if "deleting_id" not in st.session_state:
         return df
 
-    # ✅ Recherche par UUID (Action 1)
     try:
         idx, row = _find_row_by_id(df, st.session_state["deleting_id"])
     except ValueError as e:
@@ -157,7 +214,6 @@ def _render_delete_confirm(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             df, msg, msg_type = remove_asset(df, idx, row["id"])
             flash_fn(msg, msg_type)
             del st.session_state["deleting_id"]
-            # ✅ Invalide le cache : un actif vient d'être supprimé (Action 2)
             invalidate_cache_fn()
             st.rerun()
         if c2.button("Annuler", key=f"cancel_del_{idx}", width="stretch"):
@@ -168,7 +224,6 @@ def _render_delete_confirm(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
 
 
 def _render_pie_chart(df: pd.DataFrame):
-    """Affiche le camembert de répartition par catégorie."""
     from services.assets import compute_by_category
     stats = compute_by_category(df)
     if stats.empty:
@@ -193,18 +248,8 @@ def _render_pie_chart(df: pd.DataFrame):
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
-    """
-    Affiche le contenu complet du tab Actifs.
-    Retourne le DataFrame potentiellement mis à jour après une action.
-
-    Paramètres :
-    - df               : DataFrame des actifs courants
-    - invalidate_cache_fn : fonction app.py à appeler après une écriture
-    - flash_fn         : fonction app.py pour afficher un message toast
-    """
     from services.assets import compute_total
 
-    # Refresh automatique des prix au premier chargement de la session
     has_auto_assets = (
         not df.empty
         and df["categorie"].isin(CATEGORIES_AUTO).any()
@@ -217,7 +262,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.session_state["prices_refreshed"] = True
         if msg_type != "success":
             flash_fn(msg, msg_type)
-        # ✅ Invalide le cache : les prix viennent d'être rafraîchis (Action 2)
         invalidate_cache_fn()
         st.rerun()
 
