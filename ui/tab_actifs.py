@@ -8,6 +8,7 @@ Les modales sont gérées via ui/asset_form.py.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
@@ -20,8 +21,12 @@ def _render_asset_row(row: pd.Series):
     cols = st.columns([4, 2, 2, 2, 1, 1])
 
     if is_auto_row and row.get("ticker"):
+        # Récupère les tickers en erreur depuis la session
+        error_tickers = st.session_state.get("sync_error_tickers", set())
+        ticker = row["ticker"]
+        sync_dot = " 🔴" if ticker in error_tickers else " 🟢"
         cols[0].write(row["nom"])
-        cols[0].caption(f'{row["ticker"]} · {row["quantite"]:g} unités')
+        cols[0].caption(f'{ticker} · {row["quantite"]:g} unités{sync_dot}')
     else:
         cols[0].write(row["nom"])
 
@@ -88,14 +93,30 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     if "prices_refreshed" not in st.session_state and has_auto_assets:
         with st.spinner("Actualisation des prix en cours…"):
             df, msg, msg_type = refresh_prices(df)
+        # Stocke l'heure et les erreurs de synchro
         st.session_state["prices_refreshed"] = True
+        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+        st.session_state["sync_error_tickers"] = set(
+            msg.replace("Tickers introuvables : ", "").split(", ")
+        ) if msg_type == "warning" else set()
         if msg_type != "success":
             flash_fn(msg, msg_type)
         invalidate_cache_fn()
         st.rerun()
 
+    # Stocke aussi l'heure lors d'un refresh manuel (bouton sidebar)
+    # → géré via flash, mais on met à jour sync_time ici si absent
+    if has_auto_assets and "sync_time" not in st.session_state:
+        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+        st.session_state["sync_error_tickers"] = set()
+
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+
+    # Indicateur de synchro global — discret, sous le total
+    if has_auto_assets and "sync_time" in st.session_state:
+        st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
+
     st.space(size="small")
 
     if df.empty:

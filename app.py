@@ -15,6 +15,7 @@ from ui.tab_actifs import render as render_actifs
 from ui.tab_historique import render as render_historique
 from ui.asset_form import set_dialog_create, render_active_dialog
 from constants import CATEGORIES_AUTO
+from datetime import datetime
 
 
 st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
@@ -85,6 +86,10 @@ with st.sidebar:
         with st.spinner("Récupération des prix…"):
             df, msg, msg_type = refresh_prices(df)
         flash(msg, msg_type)
+        # Met à jour l'indicateur de synchro
+        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+        st.session_state["sync_error_tickers"] = set(
+        msg.replace("Tickers introuvables : ", "").split(", ")) if msg_type == "warning" else set()
         invalidate_data_cache()
         st.rerun()
 
