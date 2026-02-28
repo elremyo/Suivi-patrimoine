@@ -4,7 +4,7 @@ from datetime import date
 from pandas.errors import EmptyDataError
 from constants import HISTORIQUE_PATH
 from services.storage import safe_write_csv
-from services.positions import get_quantity_at
+
 
 COLUMNS = ["asset_id", "date", "montant"]
 
@@ -145,6 +145,10 @@ def _compute_raw_evolution(
 
     C'est la source unique utilisée par build_total_evolution,
     build_category_evolution et build_asset_evolution.
+
+    Approche vectorisée : on boucle sur les actifs (ex. 10),
+    pas sur dates × actifs (ex. 3 650). Pour chaque actif,
+    merge_asof résout toutes les dates en une seule opération pandas.
     """
     if df_assets.empty:
         return pd.DataFrame()
@@ -157,24 +161,84 @@ def _compute_raw_evolution(
     if earliest is not None:
         all_dates = all_dates[all_dates >= earliest]
 
-    records = []
-    for d in all_dates:
-        for _, asset in df_assets.iterrows():
-            if asset["categorie"] in categories_auto and asset["ticker"]:
-                val = _auto_value_at(asset, d, df_positions, df_prices)
-            else:
-                val = get_montant_at(asset["id"], d, df_hist)
+    dates_df = pd.DataFrame({"date": all_dates})
+    parts = []
 
-            if val is not None:
-                records.append({
-                    "date":      d,
-                    "asset_id":  asset["id"],
-                    "nom":       asset["nom"],
-                    "categorie": asset["categorie"],
-                    "valeur":    val,
-                })
+    auto_mask = df_assets["categorie"].isin(categories_auto) & (df_assets["ticker"] != "")
+    manual_assets = df_assets[~auto_mask]
+    auto_assets = df_assets[auto_mask]
 
-    return pd.DataFrame(records)
+    # ── Actifs manuels ────────────────────────────────────────────────────────
+    # Pour chaque actif manuel : merge_asof entre toutes les dates et son historique.
+    # Cela retourne, pour chaque date, le dernier montant connu avant cette date.
+    if not manual_assets.empty and not df_hist.empty:
+        hist_sorted = df_hist.sort_values("date")
+        for _, asset in manual_assets.iterrows():
+            asset_hist = hist_sorted[hist_sorted["asset_id"] == asset["id"]]
+            if asset_hist.empty:
+                continue
+            merged = pd.merge_asof(
+                dates_df,
+                asset_hist[["date", "montant"]],
+                on="date",
+                direction="backward",
+            )
+            merged = merged.dropna(subset=["montant"])
+            if merged.empty:
+                continue
+            merged["asset_id"]  = asset["id"]
+            merged["nom"]       = asset["nom"]
+            merged["categorie"] = asset["categorie"]
+            merged = merged.rename(columns={"montant": "valeur"})
+            parts.append(merged[["date", "asset_id", "nom", "categorie", "valeur"]])
+
+    # ── Actifs automatiques ───────────────────────────────────────────────────
+    # On convertit df_prices en format long (date, ticker, price) une seule fois,
+    # puis pour chaque actif auto on fait deux merge_asof :
+    #   1. prix historique à chaque date
+    #   2. quantité détenue à chaque date
+    # La valeur est ensuite prix × quantité.
+    if not auto_assets.empty and not df_prices.empty and not df_positions.empty:
+        prices_long = df_prices.stack().reset_index()
+        prices_long.columns = ["date", "ticker", "price"]
+        prices_long["date"] = pd.to_datetime(prices_long["date"]).dt.normalize()
+        prices_long = prices_long.sort_values("date")
+
+        positions_sorted = df_positions.sort_values("date")
+
+        for _, asset in auto_assets.iterrows():
+            ticker = asset["ticker"]
+            if ticker not in df_prices.columns:
+                continue
+
+            asset_prices = prices_long[prices_long["ticker"] == ticker]
+            asset_positions = positions_sorted[positions_sorted["asset_id"] == asset["id"]]
+            if asset_positions.empty:
+                continue
+
+            # Pour chaque date de prix, trouver la dernière quantité connue
+            merged = pd.merge_asof(
+                asset_prices,
+                asset_positions[["date", "quantite"]],
+                on="date",
+                direction="backward",
+            )
+            merged = merged.dropna(subset=["quantite"])
+            # Garder uniquement les dates qui sont dans all_dates
+            merged = merged[merged["date"].isin(all_dates)]
+            if merged.empty:
+                continue
+
+            merged["valeur"]    = (merged["price"] * merged["quantite"]).round(2)
+            merged["asset_id"]  = asset["id"]
+            merged["nom"]       = asset["nom"]
+            merged["categorie"] = asset["categorie"]
+            parts.append(merged[["date", "asset_id", "nom", "categorie", "valeur"]])
+
+    if not parts:
+        return pd.DataFrame()
+
+    return pd.concat(parts, ignore_index=True)
 
 
 # ── Helpers privés ────────────────────────────────────────────────────────────
@@ -201,26 +265,3 @@ def _earliest_known_date(df_hist: pd.DataFrame, df_positions: pd.DataFrame) -> p
     if not candidates:
         return None
     return min(candidates)
-
-
-def _auto_value_at(
-    asset: pd.Series,
-    at_date: pd.Timestamp,
-    df_positions: pd.DataFrame,
-    df_prices: pd.DataFrame,
-) -> float | None:
-    """Calcule la valeur d'un actif auto à une date : prix × quantité connue."""
-    ticker = asset["ticker"]
-    quantite = get_quantity_at(asset["id"], at_date, df_positions)
-    if quantite is None:
-        return None
-
-    if df_prices.empty or ticker not in df_prices.columns:
-        return None
-
-    prices_series = df_prices[ticker].dropna()
-    past_prices = prices_series[prices_series.index.normalize() <= at_date.normalize()]
-    if past_prices.empty:
-        return None
-
-    return round(float(past_prices.iloc[-1]) * quantite, 2)

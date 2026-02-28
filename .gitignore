@@ -24,5 +24,4 @@ Thumbs.db
 .vscode/
 
 # Scripts locaux
-run.bat
-run_tests.bat
+scripts_perso/
