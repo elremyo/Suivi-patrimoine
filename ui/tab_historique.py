@@ -37,7 +37,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         return
 
     # Sélecteur de période
-    period_label = st.segmented_control(
+    period_label = st.pills(
         "Période",
         options=list(PERIOD_OPTIONS.keys()),
         default=PERIOD_DEFAULT,

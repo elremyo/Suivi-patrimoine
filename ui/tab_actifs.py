@@ -25,17 +25,19 @@ def _render_asset_row(row: pd.Series):
     else:
         cols[0].write(row["nom"])
 
-    cols[1].write(row["categorie"])
+    #write avec une puce colorée selon la catégorie
+    category_color = CATEGORY_COLOR_MAP.get(row["categorie"], "#CCCCCC")
+    cols[1].markdown(f"<span style='color:{category_color}'>●</span> {row['categorie']}", unsafe_allow_html=True)
     cols[2].write(f"{row['montant']:,.2f} €")
 
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
         valeur_achat = row["pru"] * row["quantite"]
         pnl = row["montant"] - valeur_achat
         pnl_pct = (pnl / valeur_achat * 100) if valeur_achat else 0
-        color = "green" if pnl >= 0 else "red"
+        sign_color = "green" if pnl >= 0 else "red"
         sign = "+" if pnl >= 0 else ""
-        icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
-        cols[3].markdown(f":{color}-badge[{icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
+        sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
+        cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
     else:
         cols[3].write("--")
 
@@ -56,7 +58,7 @@ def _render_pie_chart(df: pd.DataFrame):
     if stats.empty:
         return
 
-    st.subheader("Répartition par catégorie")
+    st.subheader("Répartition par catégorie",anchor=False)
     fig = go.Figure(go.Pie(
         labels=stats["categorie"],
         values=stats["montant"],
@@ -92,7 +94,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         invalidate_cache_fn()
         st.rerun()
 
-    st.subheader("Actifs")
+    st.subheader("Actifs",anchor=False)
 
     if df.empty:
         st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")

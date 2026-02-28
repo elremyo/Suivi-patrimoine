@@ -65,7 +65,7 @@ def show_flash():
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.title("Suivi de patrimoine")
+    st.title("Suivi de patrimoine",anchor=False)
     st.divider()
 
     if st.button("Ajouter un actif", type="primary", use_container_width=True, icon=":material/add:"):
@@ -110,7 +110,7 @@ render_active_dialog(df, invalidate_data_cache, flash)
 
 # ── Page principale ───────────────────────────────────────────────────────────
 
-st.title("Suivi de patrimoine")
+st.title("Suivi de patrimoine",anchor=False)
 
 tab_actifs, tab_historique = st.tabs(["📋 Actifs", "📈 Historique"])
 
