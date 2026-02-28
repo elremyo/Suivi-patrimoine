@@ -1,7 +1,7 @@
 """
 ui/tab_actifs.py
 ───────────────────
-Contenu du tab "📋 Actifs" : liste des actifs, total patrimoine, camembert.
+Contenu du tab "📋 Actifs" : liste des actifs groupés par catégorie, total patrimoine, camembert.
 Les modales sont gérées via ui/asset_form.py.
 """
 
@@ -11,17 +11,16 @@ import plotly.graph_objects as go
 from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_edit, set_dialog_delete
-from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
 
 
-# ── Ligne d'actif ─────────────────────────────────────────────────────────────
+# ── Ligne d'actif (dans le détail d'une catégorie) ───────────────────────────
 
 def _render_asset_row(row: pd.Series):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 2, 1, 1])
+    cols = st.columns([4, 2, 2, 1, 1])
 
     if is_auto_row and row.get("ticker"):
-        # Récupère les tickers en erreur depuis la session
         error_tickers = st.session_state.get("sync_error_tickers", set())
         ticker = row["ticker"]
         sync_dot = " 🔴" if ticker in error_tickers else " 🟢"
@@ -30,10 +29,7 @@ def _render_asset_row(row: pd.Series):
     else:
         cols[0].write(row["nom"])
 
-    #write avec une puce colorée selon la catégorie
-    category_color = CATEGORY_COLOR_MAP.get(row["categorie"], "#CCCCCC")
-    cols[1].markdown(f"<span style='color:{category_color}'>●</span> {row['categorie']}", unsafe_allow_html=True)
-    cols[2].write(f"{row['montant']:,.2f} €")
+    cols[1].write(f"{row['montant']:,.2f} €")
 
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
         valeur_achat = row["pru"] * row["quantite"]
@@ -42,17 +38,61 @@ def _render_asset_row(row: pd.Series):
         sign_color = "green" if pnl >= 0 else "red"
         sign = "+" if pnl >= 0 else ""
         sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
-        cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
+        cols[2].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
     else:
-        cols[3].write("--")
+        cols[2].write("")
 
-    if cols[4].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
+    if cols[3].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
         set_dialog_edit(row["id"])
         st.rerun()
 
-    if cols[5].button("", key=f"del_{row['id']}", icon=":material/delete:"):
+    if cols[4].button("", key=f"del_{row['id']}", icon=":material/delete:"):
         set_dialog_delete(row["id"])
         st.rerun()
+
+
+# ── Bloc catégorie (expander) ─────────────────────────────────────────────────
+
+def _render_category_block(categorie: str, df_cat: pd.DataFrame, total_patrimoine: float):
+    """Affiche un expander pour une catégorie avec ses stats et ses actifs."""
+
+    # ── Calculs ───────────────────────────────────────────────────────────────
+    montant_cat = df_cat["montant"].sum()
+    nb_actifs   = len(df_cat)
+    pct         = (montant_cat / total_patrimoine * 100) if total_patrimoine else 0
+
+    # P&L uniquement pour les catégories auto
+    pnl_str = ""
+    if categorie in CATEGORIES_AUTO:
+        mask_pnl = (df_cat["quantite"] > 0) & (df_cat["pru"] > 0)
+        if mask_pnl.any():
+            valeur_achat = (df_cat.loc[mask_pnl, "pru"] * df_cat.loc[mask_pnl, "quantite"]).sum()
+            pnl_total    = df_cat.loc[mask_pnl, "montant"].sum() - valeur_achat
+            pnl_pct      = (pnl_total / valeur_achat * 100) if valeur_achat else 0
+            sign         = "+" if pnl_total >= 0 else ""
+            pnl_color    = "green" if pnl_total >= 0 else "red"
+            pnl_icon     = ":material/trending_up:" if pnl_total >= 0 else ":material/trending_down:"
+            pnl_str      = f"  :{pnl_color}-badge[{pnl_icon} {sign}{pnl_total:,.0f} € ({sign}{pnl_pct:.1f}%)]"
+
+    # ── Titre de l'expander ───────────────────────────────────────────────────
+    actifs_label = "actif" if nb_actifs == 1 else "actifs"
+    label = (
+        f"**{categorie}** - "
+        f"  :gray-badge[{nb_actifs} {actifs_label}] - "
+        f"  **{montant_cat:,.0f} €**"
+        f"{pnl_str}"
+    )
+
+    # ── Expander ──────────────────────────────────────────────────────────────
+    with st.expander(label, expanded=False):
+        st.space(size="small")
+        for _, row in df_cat.iterrows():
+            _render_asset_row(row)
+            #afficher un divider entre les actifs, sauf après le dernier
+            if row.name != df_cat.index[-1]:
+                st.divider()
+            else:
+                st.space(size="small")
 
 
 # ── Graphique camembert ───────────────────────────────────────────────────────
@@ -63,7 +103,7 @@ def _render_pie_chart(df: pd.DataFrame):
     if stats.empty:
         return
 
-    st.subheader("Répartition par catégorie",anchor=False)
+    st.subheader("Répartition par catégorie", anchor=False)
     fig = go.Figure(go.Pie(
         labels=stats["categorie"],
         values=stats["montant"],
@@ -73,7 +113,7 @@ def _render_pie_chart(df: pd.DataFrame):
         hole=0.35,
     ))
     fig.update_layout(
-        **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
+        **{**PLOTLY_LAYOUT, "margin": dict(l=50, r=50, t=50, b=50)},
         showlegend=False,
     )
     st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
@@ -90,10 +130,10 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         and df["ticker"].notna().any()
         and (df["ticker"] != "").any()
     )
+
     if "prices_refreshed" not in st.session_state and has_auto_assets:
         with st.spinner("Actualisation des prix en cours…"):
             df, msg, msg_type = refresh_prices(df)
-        # Stocke l'heure et les erreurs de synchro
         st.session_state["prices_refreshed"] = True
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set(
@@ -104,27 +144,29 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         invalidate_cache_fn()
         st.rerun()
 
-    # Stocke aussi l'heure lors d'un refresh manuel (bouton sidebar)
-    # → géré via flash, mais on met à jour sync_time ici si absent
     if has_auto_assets and "sync_time" not in st.session_state:
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set()
 
+    # ── Total patrimoine ──────────────────────────────────────────────────────
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
 
-    # Indicateur de synchro global — discret, sous le total
     if has_auto_assets and "sync_time" in st.session_state:
         st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
     st.space(size="small")
 
+    # ── Liste groupée par catégorie ───────────────────────────────────────────
     if df.empty:
         st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")
     else:
-        for _, row in df.iterrows():
-            with st.container(border=True, vertical_alignment="center"):
-                _render_asset_row(row)
+        # On respecte l'ordre défini dans CATEGORIES_ASSETS
+        categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
+
+        for categorie in categories_presentes:
+            df_cat = df[df["categorie"] == categorie].reset_index(drop=True)
+            _render_category_block(categorie, df_cat, total)
 
     st.space(size="small")
     _render_pie_chart(df)
