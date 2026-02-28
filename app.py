@@ -9,7 +9,7 @@ Responsabilités limitées à :
 - Routing vers les tabs (tab_actifs, tab_historique)
 
 Toute la logique métier est dans services/asset_manager.py.
-Tout le rendu des tabs est dans pages/tab_actifs.py et pages/tab_historique.py.
+Tout le rendu des tabs est dans ui/tab_actifs.py et ui/tab_historique.py.
 """
 
 import streamlit as st
@@ -19,8 +19,8 @@ from services.assets import get_assets
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
 from services.positions import init_positions, load_positions
 from services.asset_manager import create_auto_asset, create_manual_asset, refresh_prices
-from pages.tab_actifs import render as render_actifs
-from pages.tab_historique import render as render_historique
+from ui.tab_actifs import render as render_actifs
+from ui.tab_historique import render as render_historique
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO
 
 

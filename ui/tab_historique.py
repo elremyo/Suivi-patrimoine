@@ -1,5 +1,5 @@
 """
-pages/tab_historique.py
+ui/tab_historique.py
 ───────────────────────
 Contenu du tab "📈 Historique" : sélecteur de période, courbes d'évolution
 du patrimoine total et par catégorie.
@@ -14,6 +14,8 @@ from services.historique import build_total_evolution, build_category_evolution
 from services.pricer import fetch_historical_prices
 from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
 
+st.write("debug tab_historique")
+
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
@@ -26,6 +28,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     - df_hist      : historique des montants manuels
     - df_positions : historique des positions (actifs auto)
     """
+    st.write("debug render")
     auto_tickers = sorted(
         df[df["categorie"].isin(CATEGORIES_AUTO) & (df["ticker"] != "")]["ticker"]
         .dropna().unique().tolist()
@@ -89,6 +92,8 @@ def _render_chart(
     options_cat: list[str],
 ):
     """Construit et affiche le graphique Plotly des séries sélectionnées."""
+    st.write("debug render_chart")
+
     fig = go.Figure()
 
     for serie in selected:

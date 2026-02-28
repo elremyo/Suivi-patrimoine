@@ -1,5 +1,5 @@
 """
-pages/tab_actifs.py
+ui/tab_actifs.py
 ───────────────────
 Contenu du tab "📋 Actifs" : liste des actifs, édition, suppression,
 total patrimoine et camembert de répartition.
