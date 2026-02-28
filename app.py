@@ -110,6 +110,8 @@ render_active_dialog(df, invalidate_data_cache, flash)
 
 # ── Page principale ───────────────────────────────────────────────────────────
 
+st.logo(image=":material/finance_mode:", size="large",icon_image=":material/finance_mode:")
+
 st.title("Suivi de patrimoine",anchor=False)
 
 tab_actifs, tab_historique = st.tabs(["📋 Actifs", "📈 Historique"])
