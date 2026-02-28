@@ -94,7 +94,9 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         invalidate_cache_fn()
         st.rerun()
 
-    st.subheader("Actifs",anchor=False)
+    total = compute_total(df)
+    st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+    st.space(size="small")
 
     if df.empty:
         st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")
@@ -103,9 +105,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
             with st.container(border=True, vertical_alignment="center"):
                 _render_asset_row(row)
 
-    st.space(size="small")
-    total = compute_total(df)
-    st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
     st.space(size="small")
     _render_pie_chart(df)
 

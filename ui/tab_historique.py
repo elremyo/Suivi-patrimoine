@@ -36,11 +36,12 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         st.info("Aucun historique disponible. Ajoutez des actifs et mettez à jour leurs montants pour construire un historique.")
         return
 
-    # Sélecteur de période
-    period_label = st.pills(
+    # Sélecteur de période format radio
+    period_label = st.radio(
         "Période",
         options=list(PERIOD_OPTIONS.keys()),
-        default=PERIOD_DEFAULT,
+        index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
+        horizontal=True,
         key="period_selector",
     )
     yf_period, nb_jours = PERIOD_OPTIONS[period_label]
