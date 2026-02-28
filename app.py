@@ -16,7 +16,7 @@ import streamlit as st
 import pandas as pd
 from services.storage import init_storage, download_assets
 from services.assets import get_assets
-from services.historique import init_historique, load_historique
+from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
 from services.positions import init_positions, load_positions
 from services.asset_manager import create_auto_asset, create_manual_asset, refresh_prices
 from pages.tab_actifs import render as render_actifs
@@ -54,6 +54,8 @@ def invalidate_data_cache():
     cached_load_assets.clear()
     cached_load_historique.clear()
     cached_load_positions.clear()
+    build_total_evolution.clear()
+    build_category_evolution.clear()
 
 
 df = cached_load_assets()

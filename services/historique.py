@@ -1,8 +1,9 @@
 import os
 import pandas as pd
+import streamlit as st
 from datetime import date
 from pandas.errors import EmptyDataError
-from constants import HISTORIQUE_PATH
+from constants import HISTORIQUE_PATH, CACHE_TTL_SECONDS
 from services.storage import safe_write_csv
 
 
@@ -68,12 +69,13 @@ def get_montant_at(asset_id: str, at_date: pd.Timestamp, df_hist: pd.DataFrame) 
 
 # ── Fonctions publiques d'évolution ──────────────────────────────────────────
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def build_total_evolution(
     df_assets: pd.DataFrame,
     df_hist: pd.DataFrame,
     df_positions: pd.DataFrame,
     df_prices: pd.DataFrame,
-    categories_auto: set,
+    categories_auto: tuple,  # tuple pour être hashable par st.cache_data
 ) -> pd.DataFrame:
     """
     Retourne un DataFrame { date, total } avec la valeur totale du patrimoine
@@ -88,12 +90,13 @@ def build_total_evolution(
     return result.sort_values("date").reset_index(drop=True)
 
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def build_category_evolution(
     df_assets: pd.DataFrame,
     df_hist: pd.DataFrame,
     df_positions: pd.DataFrame,
     df_prices: pd.DataFrame,
-    categories_auto: set,
+    categories_auto: tuple,  # tuple pour être hashable par st.cache_data
 ) -> pd.DataFrame:
     """
     Retourne un DataFrame pivot date × catégorie avec la valeur de chaque catégorie
@@ -108,12 +111,13 @@ def build_category_evolution(
     return pivot.sort_index()
 
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def build_asset_evolution(
     df_assets: pd.DataFrame,
     df_hist: pd.DataFrame,
     df_positions: pd.DataFrame,
     df_prices: pd.DataFrame,
-    categories_auto: set,
+    categories_auto: tuple,  # tuple pour être hashable par st.cache_data
 ) -> pd.DataFrame:
     """
     Retourne un DataFrame pivot date × nom d'actif avec la valeur de chaque actif
@@ -135,7 +139,7 @@ def _compute_raw_evolution(
     df_hist: pd.DataFrame,
     df_positions: pd.DataFrame,
     df_prices: pd.DataFrame,
-    categories_auto: set,
+    categories_auto: tuple,
 ) -> pd.DataFrame:
     """
     Calcule la valeur de chaque actif à chaque date disponible.

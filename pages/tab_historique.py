@@ -53,8 +53,8 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
 
     with st.spinner("Reconstruction de l'historique…"):
         df_prices = fetch_historical_prices(tuple(auto_tickers), yf_period) if auto_tickers else pd.DataFrame()
-        total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
-        cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, CATEGORIES_AUTO)
+        total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
+        cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
 
     # Filtrage par période
     if start_date is not None:
