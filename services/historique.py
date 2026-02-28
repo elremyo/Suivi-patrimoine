@@ -220,16 +220,21 @@ def _compute_raw_evolution(
             if asset_positions.empty:
                 continue
 
-            # Pour chaque date de prix, trouver la dernière quantité connue
+            # Pour chaque date (y compris weekends), trouver le dernier prix connu
             merged = pd.merge_asof(
-                asset_prices,
+                dates_df,
+                asset_prices[["date", "price"]],
+                on="date",
+                direction="backward",
+            )
+            # Puis trouver la dernière quantité connue à chaque date
+            merged = pd.merge_asof(
+                merged,
                 asset_positions[["date", "quantite"]],
                 on="date",
                 direction="backward",
             )
-            merged = merged.dropna(subset=["quantite"])
-            # Garder uniquement les dates qui sont dans all_dates
-            merged = merged[merged["date"].isin(all_dates)]
+            merged = merged.dropna(subset=["quantite", "price"])
             if merged.empty:
                 continue
 
