@@ -90,11 +90,14 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
 
     Retourne un dict {ticker, name, price, currency} ou None si pas encore validé.
     """
+    help_ticker=""":small[Le ticker est affiché entre parenthèses sur https://finance.yahoo.com/markets/]"""
+
     ticker_input = st.text_input(
         "Ticker *",
         value=initial_ticker,
         placeholder="ex. AAPL, BTC-USD, CW8.PA",
         key="_form_ticker_input",
+        help=help_ticker
     ).strip().upper()
 
     if st.session_state.get("_form_ticker_last") != ticker_input:
@@ -149,7 +152,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         return df
 
     quantite = st.number_input("Quantité", min_value=0.0, value=initial_quantite, step=1.0, format="%g", key="_form_quantite")
-    pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru")
+    pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire/Prix d'achat (hors frais).")
     categorie = st.selectbox(
         "Catégorie", options=auto_categories,
         index=auto_categories.index(initial_categorie),

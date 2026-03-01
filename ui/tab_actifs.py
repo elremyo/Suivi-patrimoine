@@ -102,8 +102,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     if has_auto_assets and "sync_time" in st.session_state:
         st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
-    st.space(size="small")
-
     if df.empty:
         st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")
     else:
