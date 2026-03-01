@@ -3,9 +3,11 @@ import uuid
 import pandas as pd
 from filelock import FileLock
 from pandas.errors import EmptyDataError
-from constants import DATA_PATH
+from constants import DATA_PATH, HISTORIQUE_PATH, POSITIONS_PATH
 
 COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
+HISTORIQUE_COLUMNS = ["asset_id", "date", "montant"]
+POSITIONS_COLUMNS = ["asset_id", "date", "quantite"]
 
 
 def _lock_path(csv_path: str) -> str:
@@ -66,5 +68,90 @@ def save_assets(df):
     safe_write_csv(df, DATA_PATH)
 
 
-def download_assets(df):
+# ── Export ────────────────────────────────────────────────────────────────────
+
+def download_assets(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
+
+
+def download_historique() -> bytes:
+    """Lit et retourne le fichier historique en bytes pour téléchargement."""
+    try:
+        df = pd.read_csv(HISTORIQUE_PATH)
+    except (EmptyDataError, FileNotFoundError):
+        df = pd.DataFrame(columns=HISTORIQUE_COLUMNS)
+    return df.to_csv(index=False).encode("utf-8")
+
+
+def download_positions() -> bytes:
+    """Lit et retourne le fichier positions en bytes pour téléchargement."""
+    try:
+        df = pd.read_csv(POSITIONS_PATH)
+    except (EmptyDataError, FileNotFoundError):
+        df = pd.DataFrame(columns=POSITIONS_COLUMNS)
+    return df.to_csv(index=False).encode("utf-8")
+
+
+# ── Import ────────────────────────────────────────────────────────────────────
+
+def _validate_columns(df: pd.DataFrame, expected: list[str], label: str) -> tuple[bool, str]:
+    """Vérifie que le DataFrame importé contient bien les colonnes attendues."""
+    missing = [c for c in expected if c not in df.columns]
+    if missing:
+        return False, f"Fichier {label} invalide — colonnes manquantes : {', '.join(missing)}"
+    return True, ""
+
+
+def import_assets(uploaded_file) -> tuple[bool, str]:
+    """
+    Remplace le fichier actifs par le CSV uploadé.
+    Retourne (succès, message).
+    """
+    try:
+        df = pd.read_csv(uploaded_file)
+        ok, err = _validate_columns(df, ["nom", "categorie", "montant"], "actifs")
+        if not ok:
+            return False, err
+        # Colonnes optionnelles : on les ajoute si absentes (compatibilité)
+        if "id" not in df.columns:
+            df.insert(0, "id", [str(uuid.uuid4()) for _ in range(len(df))])
+        for col, default in [("ticker", ""), ("quantite", 0.0), ("pru", 0.0),
+                              ("courtier", ""), ("enveloppe", "")]:
+            if col not in df.columns:
+                df[col] = default
+        safe_write_csv(df, DATA_PATH)
+        return True, f"{len(df)} actif(s) importé(s) avec succès."
+    except Exception as e:
+        return False, f"Erreur lors de l'import des actifs : {e}"
+
+
+def import_historique(uploaded_file) -> tuple[bool, str]:
+    """
+    Remplace le fichier historique par le CSV uploadé.
+    Retourne (succès, message).
+    """
+    try:
+        df = pd.read_csv(uploaded_file, parse_dates=["date"])
+        ok, err = _validate_columns(df, HISTORIQUE_COLUMNS, "historique")
+        if not ok:
+            return False, err
+        safe_write_csv(df, HISTORIQUE_PATH)
+        return True, f"{len(df)} entrée(s) d'historique importée(s) avec succès."
+    except Exception as e:
+        return False, f"Erreur lors de l'import de l'historique : {e}"
+
+
+def import_positions(uploaded_file) -> tuple[bool, str]:
+    """
+    Remplace le fichier positions par le CSV uploadé.
+    Retourne (succès, message).
+    """
+    try:
+        df = pd.read_csv(uploaded_file, parse_dates=["date"])
+        ok, err = _validate_columns(df, POSITIONS_COLUMNS, "positions")
+        if not ok:
+            return False, err
+        safe_write_csv(df, POSITIONS_PATH)
+        return True, f"{len(df)} position(s) importée(s) avec succès."
+    except Exception as e:
+        return False, f"Erreur lors de l'import des positions : {e}"

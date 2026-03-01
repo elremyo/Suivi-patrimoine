@@ -11,7 +11,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 from services.asset_manager import refresh_prices
-from services.storage import download_assets
+from services.storage import (
+    download_assets, download_historique, download_positions,
+    import_assets, import_historique, import_positions,
+)
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
 
@@ -63,8 +66,6 @@ def _render_asset_row(row: pd.Series):
         cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
     # ── Boutons ───────────────────────────────────────────────────────────────
-    
-    
     if cols[4].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
         set_dialog_edit(row["id"])
         st.rerun()
@@ -72,6 +73,89 @@ def _render_asset_row(row: pd.Series):
     if cols[5].button("", key=f"del_{row['id']}", icon=":material/delete:"):
         set_dialog_delete(row["id"])
         st.rerun()
+
+
+# ── Section sauvegarde ────────────────────────────────────────────────────────
+
+def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
+    """Affiche les boutons d'export et les zones d'import en bas de l'onglet."""
+    st.divider()
+    st.subheader("Sauvegarde", anchor=False)
+
+    # ── Export ────────────────────────────────────────────────────────────────
+    st.caption("Télécharger")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.download_button(
+            "Actifs",
+            data=download_assets(df),
+            file_name="patrimoine.csv",
+            mime="text/csv",
+            icon=":material/download:",
+            use_container_width=True,
+            key="btn_dl_assets",
+        )
+
+    with col2:
+        st.download_button(
+            "Historique",
+            data=download_historique(),
+            file_name="historique.csv",
+            mime="text/csv",
+            icon=":material/download:",
+            use_container_width=True,
+            key="btn_dl_historique",
+        )
+
+    with col3:
+        st.download_button(
+            "Positions",
+            data=download_positions(),
+            file_name="positions.csv",
+            mime="text/csv",
+            icon=":material/download:",
+            use_container_width=True,
+            key="btn_dl_positions",
+        )
+
+    # ── Import ────────────────────────────────────────────────────────────────
+    st.caption("Importer — remplace toutes les données existantes")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        f = st.file_uploader("Actifs", type="csv", label_visibility="collapsed",
+                             key=f"up_assets_{st.session_state.get('_up_assets_v', 0)}")
+        if f:
+            ok, msg = import_assets(f)
+            flash_fn(msg, "success" if ok else "error")
+            st.session_state["_up_assets_v"] = st.session_state.get("_up_assets_v", 0) + 1
+            if ok:
+                invalidate_cache_fn()
+            st.rerun()
+
+    with col2:
+        f = st.file_uploader("Historique", type="csv", label_visibility="collapsed",
+                             key=f"up_historique_{st.session_state.get('_up_historique_v', 0)}")
+        if f:
+            ok, msg = import_historique(f)
+            flash_fn(msg, "success" if ok else "error")
+            st.session_state["_up_historique_v"] = st.session_state.get("_up_historique_v", 0) + 1
+            if ok:
+                invalidate_cache_fn()
+            st.rerun()
+
+    with col3:
+        f = st.file_uploader("Positions", type="csv", label_visibility="collapsed",
+                             key=f"up_positions_{st.session_state.get('_up_positions_v', 0)}")
+        if f:
+            ok, msg = import_positions(f)
+            flash_fn(msg, "success" if ok else "error")
+            st.session_state["_up_positions_v"] = st.session_state.get("_up_positions_v", 0) + 1
+            if ok:
+                invalidate_cache_fn()
+            st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
@@ -103,7 +187,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set()
 
-
     # Affichage du total
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
@@ -132,7 +215,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                 st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
         if st.button(
-            "Compélter mon patrimoine",
+            "Compléter mon patrimoine",
             icon=":material/add:",
             type="primary",
             key="btn_add_asset",
@@ -158,13 +241,8 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                 with st.container(border=True, vertical_alignment="center"):
                     _render_asset_row(row)
             st.space(size="small")
-        st.download_button(
-            "Exporter CSV",
-            data=download_assets(df),
-            file_name="patrimoine.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            key="btn_download",
-        )
+
+    # ── Sauvegarde ────────────────────────────────────────────────────────────
+    _render_backup_section(df, invalidate_cache_fn, flash_fn)
 
     return df
