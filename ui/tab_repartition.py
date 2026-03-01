@@ -73,5 +73,4 @@ def render(df: pd.DataFrame):
         return
 
     _render_pie_chart(df)
-    st.divider()
     _render_enveloppe_metrics(df)

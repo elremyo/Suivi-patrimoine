@@ -79,53 +79,59 @@ def _render_asset_row(row: pd.Series):
 
 def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     """Affiche les boutons d'export et les zones d'import en bas de l'onglet."""
-    st.divider()
-    st.subheader("Sauvegarde", anchor=False)
+    st.space("small")
+    st.subheader("Gestion des données", anchor=False)
 
     # ── Export ────────────────────────────────────────────────────────────────
-    st.caption("Télécharger")
+    st.markdown("**Téléchargements** (.csv)")
     col1, col2, col3 = st.columns(3)
-
     with col1:
+        #st.markdown("**Actifs**")
         st.download_button(
-            "Actifs",
+            "Liste des actifs",
             data=download_assets(df),
-            file_name="patrimoine.csv",
+            file_name="sauvegarde_actifs.csv",
             mime="text/csv",
             icon=":material/download:",
             use_container_width=True,
             key="btn_dl_assets",
+            help="La liste de tes actifs : nom, catégorie, montant, ticker…",
         )
 
     with col2:
+        #st.markdown("**Historique des montants**")
+
         st.download_button(
-            "Historique",
+            "Historique des montants",
             data=download_historique(),
-            file_name="historique.csv",
+            file_name="sauvegarde_historique.csv",
             mime="text/csv",
             icon=":material/download:",
             use_container_width=True,
             key="btn_dl_historique",
+            help="L'évolution des montants dans le temps pour tes actifs manuels (livrets, immo…)",
         )
 
     with col3:
+        #st.markdown("**Historique des positions**")
         st.download_button(
-            "Positions",
+            "Historique des positions",
             data=download_positions(),
-            file_name="positions.csv",
+            file_name="sauvegarde_positions.csv",
             mime="text/csv",
             icon=":material/download:",
             use_container_width=True,
             key="btn_dl_positions",
+            help="L'évolution des quantités dans le temps pour tes actions et cryptos",
         )
 
     # ── Import ────────────────────────────────────────────────────────────────
-    st.caption("Importer — remplace toutes les données existantes")
+    st.space()
+    st.markdown("**Imports** - :orange[:material/warning: Remplace toutes les données existantes. Action irréversible !]")
 
     col1, col2, col3 = st.columns(3)
-
     with col1:
-        f = st.file_uploader("Actifs", type="csv", label_visibility="collapsed",
+        f = st.file_uploader("Importer mes actifs", type="csv",
                              key=f"up_assets_{st.session_state.get('_up_assets_v', 0)}")
         if f:
             ok, msg = import_assets(f)
@@ -136,7 +142,7 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             st.rerun()
 
     with col2:
-        f = st.file_uploader("Historique", type="csv", label_visibility="collapsed",
+        f = st.file_uploader("Importer mon historique", type="csv",
                              key=f"up_historique_{st.session_state.get('_up_historique_v', 0)}")
         if f:
             ok, msg = import_historique(f)
@@ -147,7 +153,7 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             st.rerun()
 
     with col3:
-        f = st.file_uploader("Positions", type="csv", label_visibility="collapsed",
+        f = st.file_uploader("Importer mes positions", type="csv",
                              key=f"up_positions_{st.session_state.get('_up_positions_v', 0)}")
         if f:
             ok, msg = import_positions(f)
@@ -190,6 +196,8 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     # Affichage du total
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+
+    st.space(size="small")
 
     # Affichage des boutons d'action
     with st.container(horizontal=True, vertical_alignment="center"):
