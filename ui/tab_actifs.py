@@ -18,7 +18,7 @@ from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PL
 
 def _render_asset_row(row: pd.Series):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 1, 1])
+    cols = st.columns([4, 2, 2, 0.5, 0.5])
 
     if is_auto_row and row.get("ticker"):
         error_tickers = st.session_state.get("sync_error_tickers", set())
@@ -42,11 +42,11 @@ def _render_asset_row(row: pd.Series):
     else:
         cols[2].write("")
 
-    if cols[3].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
+    if cols[3].button("", key=f"mod_{row['id']}", icon=":material/edit_square:",type="tertiary"):
         set_dialog_edit(row["id"])
         st.rerun()
 
-    if cols[4].button("", key=f"del_{row['id']}", icon=":material/delete:"):
+    if cols[4].button("", key=f"del_{row['id']}", icon=":material/delete:",type="tertiary"):
         set_dialog_delete(row["id"])
         st.rerun()
 
@@ -72,28 +72,44 @@ def _render_category_block(categorie: str, df_cat: pd.DataFrame, total_patrimoin
             sign         = "+" if pnl_total >= 0 else ""
             pnl_color    = "green" if pnl_total >= 0 else "red"
             pnl_icon     = ":material/trending_up:" if pnl_total >= 0 else ":material/trending_down:"
-            pnl_str      = f"  :{pnl_color}-badge[{pnl_icon} {sign}{pnl_total:,.0f} € ({sign}{pnl_pct:.1f}%)]"
+            pnl_str      = f":{pnl_color}-badge[{pnl_icon} {sign}{pnl_total:,.0f} € ({sign}{pnl_pct:.1f}%)]"
 
-    # ── Titre de l'expander ───────────────────────────────────────────────────
+    # ── Toggle état ouvert/fermé ──────────────────────────────────────────────
+    state_key = f"cat_expanded_{categorie}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = False
+    is_open = st.session_state[state_key]
+
+    # ── Header cliquable ──────────────────────────────────────────────────────
+    color = CATEGORY_COLOR_MAP.get(categorie, "#CCCCCC")
     actifs_label = "actif" if nb_actifs == 1 else "actifs"
-    label = (
-        f"**{categorie}** - "
-        f"  :gray-badge[{nb_actifs} {actifs_label}] - "
-        f"  **{montant_cat:,.0f} €**"
-        f"{pnl_str}"
-    )
 
-    # ── Expander ──────────────────────────────────────────────────────────────
-    with st.expander(label, expanded=False):
-        st.space(size="small")
-        for _, row in df_cat.iterrows():
-            _render_asset_row(row)
-            #afficher un divider entre les actifs, sauf après le dernier
-            if row.name != df_cat.index[-1]:
-                st.divider()
-            else:
-                st.space(size="small")
+    with st.container(border=True):
+        cols = st.columns([4, 2, 2, 0.5, 0.5])
+        puce_coloree = f"<span style='color:{color}; font-size:1.2em;'>●</span>"
+        badge_actifs = f":gray-badge[{nb_actifs} {actifs_label}]"
 
+        cols[0].markdown(f"{puce_coloree} **{categorie}** {badge_actifs}", unsafe_allow_html=True)
+        cols[1].markdown(f"**{montant_cat:,.0f} €**")
+        #cols[2].markdown(f":gray[{pct:.1f} %]")
+        cols[2].markdown(pnl_str if pnl_str else "")
+
+        chevron = ":material/keyboard_arrow_up:" if is_open else ":material/keyboard_arrow_down:"
+        cols[3].empty()
+        if cols[4].button("", key=f"toggle_{categorie}", icon=chevron,type="secondary"):
+            st.session_state[state_key] = not is_open
+            st.rerun()
+
+        # ── Détail des actifs ─────────────────────────────────────────────────
+        if is_open:
+            st.divider()
+            for _, row in df_cat.iterrows():
+                _render_asset_row(row)
+                #afficher un séparateur entre les actifs, sauf après le dernier
+                if row.name != df_cat.index[-1]:
+                    st.divider()
+                else:
+                    st.space(size="small")
 
 # ── Graphique camembert ───────────────────────────────────────────────────────
 
@@ -113,7 +129,7 @@ def _render_pie_chart(df: pd.DataFrame):
         hole=0.35,
     ))
     fig.update_layout(
-        **{**PLOTLY_LAYOUT, "margin": dict(l=50, r=50, t=50, b=50)},
+        **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
         showlegend=False,
     )
     st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
