@@ -108,6 +108,7 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
         "Vérifier le ticker",
         use_container_width=True,
         key="_form_verify_btn",
+        icon=":material/search_check_2:",
     ):
         valid, err = validate_ticker(ticker_input)
         if not valid:

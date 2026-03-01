@@ -118,7 +118,7 @@ st.logo(image=":material/finance_mode:", size="large",icon_image=":material/fina
 
 st.title("Suivi de patrimoine",anchor=False)
 
-tab_actifs, tab_repartition, tab_historique = st.tabs(["📋 Actifs", "📊 Répartition", "📈 Historique"])
+tab_actifs, tab_repartition, tab_historique = st.tabs([":material/format_list_bulleted: Actifs", ":material/pie_chart: Répartition", ":material/timeline: Historique"])
 
 with tab_actifs:
     render_actifs(df, invalidate_data_cache, flash)
