@@ -1,8 +1,9 @@
 """
 ui/tab_actifs.py
 ───────────────────
-Contenu du tab "📋 Actifs" : liste des actifs, total patrimoine, camembert.
+Contenu du tab "📋 Actifs" : liste des actifs, total patrimoine.
 Les modales sont gérées via ui/asset_form.py.
+Les graphiques de répartition sont dans ui/tab_repartition.py.
 """
 
 import streamlit as st
@@ -67,55 +68,6 @@ def _render_asset_row(row: pd.Series):
         st.rerun()
 
 
-# ── Graphique camembert ───────────────────────────────────────────────────────
-
-def _render_pie_chart(df: pd.DataFrame):
-    from services.assets import compute_by_category
-    stats = compute_by_category(df)
-    if stats.empty:
-        return
-
-    st.subheader("Répartition par catégorie", anchor=False)
-    fig = go.Figure(go.Pie(
-        labels=stats["categorie"],
-        values=stats["montant"],
-        marker=dict(colors=[CATEGORY_COLOR_MAP.get(cat, "#CCCCCC") for cat in stats["categorie"]]),
-        textinfo="label+percent",
-        textfont=dict(color="#E8EAF0", size=13),
-        hole=0.35,
-    ))
-    fig.update_layout(
-        **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
-        showlegend=False,
-    )
-    st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
-
-
-# ── Vue par enveloppe fiscale ─────────────────────────────────────────────────
-
-def _render_enveloppe_metrics(df: pd.DataFrame):
-    if df.empty:
-        return
-
-    # On ne garde que les lignes avec une enveloppe renseignée
-    df_env = df[df["enveloppe"].notna() & (df["enveloppe"].str.strip() != "")]
-    if df_env.empty:
-        return
-
-    totaux = (
-        df_env.groupby("enveloppe")["montant"]
-        .sum()
-        .sort_values(ascending=False)
-    )
-
-    st.subheader("Répartition par enveloppe", anchor=False)
-
-    #afficher un container horizontal avec une metric par enveloppe
-    with st.container(horizontal=True):
-        for enveloppe, montant in totaux.items():
-            st.metric(label=enveloppe, value=f"{montant:,.2f} €", border=True)
-
-
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
@@ -169,8 +121,5 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                 with st.container(border=True, vertical_alignment="center"):
                     _render_asset_row(row)
             st.space(size="small")
-
-    _render_pie_chart(df)
-    _render_enveloppe_metrics(df)
 
     return df

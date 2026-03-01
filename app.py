@@ -13,6 +13,7 @@ from services.positions import init_positions, load_positions
 from services.asset_manager import refresh_prices
 from ui.tab_actifs import render as render_actifs
 from ui.tab_historique import render as render_historique
+from ui.tab_repartition import render as render_repartition
 from ui.asset_form import set_dialog_create, render_active_dialog
 from constants import CATEGORIES_AUTO
 from datetime import datetime
@@ -86,7 +87,6 @@ with st.sidebar:
         with st.spinner("Récupération des prix…"):
             df, msg, msg_type = refresh_prices(df)
         flash(msg, msg_type)
-        # Met à jour l'indicateur de synchro
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set(
         msg.replace("Tickers introuvables : ", "").split(", ")) if msg_type == "warning" else set()
@@ -108,7 +108,6 @@ with st.sidebar:
 
 
 # ── Modales ───────────────────────────────────────────────────────────────────
-# Un seul appel, une seule modale possible à la fois.
 
 render_active_dialog(df, invalidate_data_cache, flash)
 
@@ -119,10 +118,13 @@ st.logo(image=":material/finance_mode:", size="large",icon_image=":material/fina
 
 st.title("Suivi de patrimoine",anchor=False)
 
-tab_actifs, tab_historique = st.tabs(["📋 Actifs", "📈 Historique"])
+tab_actifs, tab_repartition, tab_historique = st.tabs(["📋 Actifs", "📊 Répartition", "📈 Historique"])
 
 with tab_actifs:
     render_actifs(df, invalidate_data_cache, flash)
+
+with tab_repartition:
+    render_repartition(df)
 
 with tab_historique:
     render_historique(df, df_hist, df_positions)
