@@ -12,10 +12,6 @@ CATEGORIES_AUTO = {"Actions & Fonds", "Crypto"}
 # Catégories à saisie manuelle du montant
 CATEGORIES_MANUAL = {"Livrets", "Immobilier", "Fonds euros"}
 
-CATEGORY_COLORS = [
-    "#A4E84C", "#85357d", "#486df0", "#6f50e5", "#A78BFA",
-]
-
 # Couleur fixe par catégorie (indépendant de l'ordre d'affichage)
 CATEGORY_COLOR_MAP = {
     "Actions & Fonds": "#85357d",
@@ -26,7 +22,7 @@ CATEGORY_COLOR_MAP = {
 }
 
 PLOTLY_LAYOUT = dict(
-    paper_bgcolor="#1A1D27",
+    paper_bgcolor="#0F1117",
     plot_bgcolor="#1A1D27",
     font=dict(color="#E8EAF0", family="sans-serif"),
     xaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
