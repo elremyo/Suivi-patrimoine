@@ -48,11 +48,11 @@ class TestBuildTotalEvolution:
 
     def test_retourne_vide_si_assets_vide(self, df_hist_simple, df_positions_vide):
         df_assets_vide = pd.DataFrame(
-            columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru"]
+            columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
         )
         result = build_total_evolution(
             df_assets_vide, df_hist_simple, df_positions_vide,
-            pd.DataFrame(), set()
+            pd.DataFrame(), ("Actions & Fonds", "Crypto")  # tuple, pas set
         )
         assert result.empty
 
@@ -62,7 +62,7 @@ class TestBuildTotalEvolution:
             pd.DataFrame(columns=["asset_id", "date", "montant"]),
             pd.DataFrame(columns=["asset_id", "date", "quantite"]),
             pd.DataFrame(),
-            {"Actions & Fonds", "Crypto"},
+            ("Actions & Fonds", "Crypto"),  # tuple, pas set
         )
         assert result.empty
 
@@ -71,7 +71,7 @@ class TestBuildTotalEvolution:
         df_manuels = df_assets_simple[df_assets_simple["categorie"].isin(["Livrets", "Immobilier"])]
         result = build_total_evolution(
             df_manuels, df_hist_simple, df_positions_vide,
-            pd.DataFrame(), {"Actions & Fonds", "Crypto"},
+            pd.DataFrame(), ("Actions & Fonds", "Crypto"),
         )
         assert "date" in result.columns
         assert "total" in result.columns
@@ -80,7 +80,7 @@ class TestBuildTotalEvolution:
         df_manuels = df_assets_simple[df_assets_simple["categorie"].isin(["Livrets", "Immobilier"])]
         result = build_total_evolution(
             df_manuels, df_hist_simple, df_positions_vide,
-            pd.DataFrame(), {"Actions & Fonds", "Crypto"},
+            pd.DataFrame(), ("Actions & Fonds", "Crypto"),
         )
         assert (result["total"] > 0).all()
 
@@ -88,19 +88,19 @@ class TestBuildTotalEvolution:
         df_manuels = df_assets_simple[df_assets_simple["categorie"].isin(["Livrets", "Immobilier"])]
         result = build_total_evolution(
             df_manuels, df_hist_simple, df_positions_vide,
-            pd.DataFrame(), {"Actions & Fonds", "Crypto"},
+            pd.DataFrame(), ("Actions & Fonds", "Crypto"),
         )
         assert result["date"].is_monotonic_increasing
 
     def test_total_a_date_connue(self, df_hist_simple, df_positions_vide):
         """À 2024-01-01 : Livret A = 9000, Immobilier = 195000 → total = 204000."""
         df_manuels = pd.DataFrame([
-            {"id": "aaa", "nom": "Livret A",    "categorie": "Livrets",    "montant": 10000.0, "ticker": "", "quantite": 0.0, "pru": 0.0},
-            {"id": "bbb", "nom": "Appartement", "categorie": "Immobilier", "montant": 200000.0,"ticker": "", "quantite": 0.0, "pru": 0.0},
+            {"id": "aaa", "nom": "Livret A",    "categorie": "Livrets",    "montant": 10000.0,  "ticker": "", "quantite": 0.0, "pru": 0.0, "courtier": "", "enveloppe": ""},
+            {"id": "bbb", "nom": "Appartement", "categorie": "Immobilier", "montant": 200000.0, "ticker": "", "quantite": 0.0, "pru": 0.0, "courtier": "", "enveloppe": ""},
         ])
         result = build_total_evolution(
             df_manuels, df_hist_simple, df_positions_vide,
-            pd.DataFrame(), {"Actions & Fonds", "Crypto"},
+            pd.DataFrame(), ("Actions & Fonds", "Crypto"),
         )
         row = result[result["date"] == pd.Timestamp("2024-01-01")]
         assert not row.empty
