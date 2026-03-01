@@ -19,7 +19,8 @@ from constants import CATEGORIES_AUTO
 from datetime import datetime
 
 
-st.set_page_config(page_title="Suivi Patrimoine", layout="wide")
+st.set_page_config(page_title="Suivi Patrimoine", layout="wide", page_icon=":material/finance_mode:")
+
 init_storage()
 init_historique()
 init_positions()
