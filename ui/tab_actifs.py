@@ -31,12 +31,15 @@ def _render_asset_row(row: pd.Series):
     if is_auto_row and row.get("ticker"):
         error_tickers = st.session_state.get("sync_error_tickers", set())
         ticker = row["ticker"]
-        sync_dot = " 🔴" if ticker in error_tickers else " 🟢"
-        ticker_line = f"{ticker}{sync_dot}"
+        if ticker in error_tickers:
+            icon = ":red[:material/sync_problem:]"
+        else:
+            icon = ":green[:material/published_with_changes:]"
+        ticker_line = f"{ticker}"
         if meta_str:
             ticker_line += f" · {meta_str}"
         cols[0].write(row["nom"])
-        cols[0].caption(ticker_line)
+        cols[0].markdown(f"{icon} :small[:grey[{ticker_line}]]")
     else:
         cols[0].write(row["nom"])
         if meta_str:
@@ -114,6 +117,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                     disabled=not has_auto_assets,
                     help="Actualiser les prix",
                     key="btn_refresh_prices",
+                    type="tertiary"
                 ):
                     with st.spinner("Récupération des prix…"):
                         df, msg, msg_type = refresh_prices(df)
