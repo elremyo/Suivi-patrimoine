@@ -91,6 +91,31 @@ def _render_pie_chart(df: pd.DataFrame):
     st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
 
 
+# ── Vue par enveloppe fiscale ─────────────────────────────────────────────────
+
+def _render_enveloppe_metrics(df: pd.DataFrame):
+    if df.empty:
+        return
+
+    # On ne garde que les lignes avec une enveloppe renseignée
+    df_env = df[df["enveloppe"].notna() & (df["enveloppe"].str.strip() != "")]
+    if df_env.empty:
+        return
+
+    totaux = (
+        df_env.groupby("enveloppe")["montant"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    st.subheader("Répartition par enveloppe", anchor=False)
+
+    #afficher un container horizontal avec une metric par enveloppe
+    with st.container(horizontal=True):
+        for enveloppe, montant in totaux.items():
+            st.metric(label=enveloppe, value=f"{montant:,.2f} €", border=True)
+
+
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
@@ -146,5 +171,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
             st.space(size="small")
 
     _render_pie_chart(df)
+    _render_enveloppe_metrics(df)
 
     return df
