@@ -1,8 +1,6 @@
 """
 ui/tab_repartition.py
 ──────────────────────
-Contenu du tab "📊 Répartition" : camembert par catégorie et métriques par enveloppe.
-
 Point d'entrée unique : render(df)
 """
 
@@ -12,7 +10,7 @@ import plotly.graph_objects as go
 from constants import CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
 
 
-# ── Graphique camembert ───────────────────────────────────────────────────────
+# Répartition par catégorie 
 
 def _render_pie_chart(df: pd.DataFrame):
     from services.assets import compute_by_category
@@ -21,6 +19,14 @@ def _render_pie_chart(df: pd.DataFrame):
         return
 
     st.subheader("Répartition par catégorie", anchor=False)
+
+    #affichage en metriques dans un contaioner horizontal
+    with st.container(horizontal=True):
+        for _, row in stats.iterrows():
+            cat = row["categorie"]
+            montant = row["montant"]
+            st.metric(label=cat, value=f"{montant:,.2f} €", border=True,delta =f"{row['pourcentage']:.1f}%",delta_color="off",delta_arrow ="off")
+
     fig = go.Figure(go.Pie(
         labels=stats["categorie"],
         values=stats["montant"],
@@ -36,7 +42,7 @@ def _render_pie_chart(df: pd.DataFrame):
     st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
 
 
-# ── Vue par enveloppe fiscale ─────────────────────────────────────────────────
+# Répartition par catégorie enveloppe fiscale
 
 def _render_enveloppe_metrics(df: pd.DataFrame):
     if df.empty:
@@ -52,7 +58,7 @@ def _render_enveloppe_metrics(df: pd.DataFrame):
         .sort_values(ascending=False)
     )
 
-    st.subheader("Répartition par enveloppe", anchor=False)
+    st.subheader("Patrimoine par enveloppe", anchor=False)
 
     with st.container(horizontal=True):
         for enveloppe, montant in totaux.items():
