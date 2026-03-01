@@ -1,11 +1,11 @@
 [theme]
 base = "dark"
 
-# Bleu principal
-primaryColor = "#4C9BE8"
+# Couleur pricipale
+primaryColor = "#957FEF"
 
 # Fonds
-backgroundColor = "#0F1117"
+backgroundColor = "#0f1117"
 secondaryBackgroundColor = "#1A1D27"
 
 # Texte
