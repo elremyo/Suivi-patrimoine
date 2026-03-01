@@ -138,9 +138,13 @@ def edit_manual_asset(
     2. Enregistre le nouveau montant dans l'historique
     3. Sauvegarde sur le disque
     """
+    montant_actuel = float(df.loc[idx, "montant"])
+
     df = update_asset(df, idx, nom, categorie, montant,
                       courtier=courtier, enveloppe=enveloppe)
-    record_montant(asset_id, montant)
+    if montant != montant_actuel:
+        record_montant(asset_id, montant)
+        
     save_assets(df)
 
     return df, "Actif modifié", "success"
