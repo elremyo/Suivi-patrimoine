@@ -42,11 +42,11 @@ def _render_asset_row(row: pd.Series):
     else:
         cols[2].write("")
 
-    if cols[3].button("", key=f"mod_{row['id']}", icon=":material/edit_square:",type="tertiary"):
+    if cols[3].button("", key=f"mod_{row['id']}", icon=":material/edit_square:",type="tertiary", icon_position="right"):
         set_dialog_edit(row["id"])
         st.rerun()
 
-    if cols[4].button("", key=f"del_{row['id']}", icon=":material/delete:",type="tertiary"):
+    if cols[4].button("", key=f"del_{row['id']}", icon=":material/delete:",type="tertiary", icon_position="right"):
         set_dialog_delete(row["id"])
         st.rerun()
 
@@ -102,14 +102,10 @@ def _render_category_block(categorie: str, df_cat: pd.DataFrame, total_patrimoin
 
         # ── Détail des actifs ─────────────────────────────────────────────────
         if is_open:
-            st.divider()
             for _, row in df_cat.iterrows():
-                _render_asset_row(row)
-                #afficher un séparateur entre les actifs, sauf après le dernier
-                if row.name != df_cat.index[-1]:
-                    st.divider()
-                else:
-                    st.space(size="small")
+                with st.container(border=True):
+                    _render_asset_row(row)
+                
 
 # ── Graphique camembert ───────────────────────────────────────────────────────
 
