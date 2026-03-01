@@ -203,12 +203,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
             invalidate_cache_fn()
             st.rerun()
 
-    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
-        _close_dialog()
-        st.rerun()
-
     return df
-
 
 def _cancel_button():
     """Bouton Annuler standalone (quand le formulaire n'est pas encore complet)."""
