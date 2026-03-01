@@ -47,8 +47,8 @@ def invalidate_data_cache():
     build_category_evolution.clear()
 
 
-df          = cached_load_assets()
-df_hist     = cached_load_historique()
+df           = cached_load_assets()
+df_hist      = cached_load_historique()
 df_positions = cached_load_positions()
 
 
@@ -64,49 +64,6 @@ def show_flash():
         st.toast(f["msg"], icon=icons.get(f["type"], "ℹ️"))
 
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-
-with st.sidebar:
-    st.title("Suivi de patrimoine",anchor=False)
-    st.divider()
-
-    if st.button("Ajouter un actif", type="primary", use_container_width=True, icon=":material/add:"):
-        set_dialog_create()
-        st.rerun()
-
-    st.divider()
-
-    has_auto_assets = (
-        not df.empty
-        and df["categorie"].isin(CATEGORIES_AUTO).any()
-        and df["ticker"].notna().any()
-        and (df["ticker"] != "").any()
-    )
-
-    if st.button("Actualiser les prix", disabled=not has_auto_assets, use_container_width=True, icon=":material/refresh:"):
-        with st.spinner("Récupération des prix…"):
-            df, msg, msg_type = refresh_prices(df)
-        flash(msg, msg_type)
-        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
-        st.session_state["sync_error_tickers"] = set(
-        msg.replace("Tickers introuvables : ", "").split(", ")) if msg_type == "warning" else set()
-        invalidate_data_cache()
-        st.rerun()
-
-    st.divider()
-
-    st.download_button(
-        "Télécharger le patrimoine",
-        data=download_assets(df),
-        file_name="patrimoine.csv",
-        mime="text/csv",
-        use_container_width=True,
-        icon=":material/download:",
-    )
-
-    show_flash()
-
-
 # ── Modales ───────────────────────────────────────────────────────────────────
 
 render_active_dialog(df, invalidate_data_cache, flash)
@@ -114,11 +71,13 @@ render_active_dialog(df, invalidate_data_cache, flash)
 
 # ── Page principale ───────────────────────────────────────────────────────────
 
-st.logo(image=":material/finance_mode:", size="large",icon_image=":material/finance_mode:")
+show_flash()
 
-st.title("Suivi de patrimoine",anchor=False)
+st.logo(image=":material/finance_mode:", size="large", icon_image=":material/finance_mode:")
 
-tab_actifs, tab_repartition, tab_historique = st.tabs([":material/format_list_bulleted: Actifs", ":material/pie_chart: Répartition", ":material/timeline: Historique"])
+st.title("Suivi de patrimoine", anchor=False)
+
+tab_actifs, tab_repartition, tab_historique = st.tabs(["📋 Actifs", "📊 Répartition", "📈 Historique"])
 
 with tab_actifs:
     render_actifs(df, invalidate_data_cache, flash)

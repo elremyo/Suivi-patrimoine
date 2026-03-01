@@ -11,7 +11,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 from services.asset_manager import refresh_prices
-from ui.asset_form import set_dialog_edit, set_dialog_delete
+from services.storage import download_assets
+from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
 
 
@@ -25,7 +26,7 @@ def _render_asset_row(row: pd.Series):
     courtier  = str(row.get("courtier",  "") or "").strip()
     enveloppe = str(row.get("enveloppe", "") or "").strip()
     meta_parts = [p for p in [courtier, enveloppe] if p]
-    meta_str   = " · ".join(meta_parts)  # ex. "Boursorama · PEA"
+    meta_str   = " · ".join(meta_parts)
 
     if is_auto_row and row.get("ticker"):
         error_tickers = st.session_state.get("sync_error_tickers", set())
@@ -59,6 +60,8 @@ def _render_asset_row(row: pd.Series):
         cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
     # ── Boutons ───────────────────────────────────────────────────────────────
+    
+    
     if cols[4].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
         set_dialog_edit(row["id"])
         st.rerun()
@@ -79,6 +82,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         and df["ticker"].notna().any()
         and (df["ticker"] != "").any()
     )
+
     if "prices_refreshed" not in st.session_state and has_auto_assets:
         with st.spinner("Actualisation des prix en cours…"):
             df, msg, msg_type = refresh_prices(df)
@@ -96,14 +100,45 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set()
 
+
+    # Affichage du total
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
 
-    if has_auto_assets and "sync_time" in st.session_state:
-        st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
+    # Affichage des boutons d'action
+    with st.container(horizontal=True, vertical_alignment="center"):
+        with st.container(horizontal=True, vertical_alignment="center"):
+            if st.button(
+                    "",
+                    icon=":material/refresh:",
+                    disabled=not has_auto_assets,
+                    help="Actualiser les prix",
+                    key="btn_refresh_prices",
+                ):
+                    with st.spinner("Récupération des prix…"):
+                        df, msg, msg_type = refresh_prices(df)
+                    flash_fn(msg, msg_type)
+                    st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+                    st.session_state["sync_error_tickers"] = set(
+                        msg.replace("Tickers introuvables : ", "").split(", ")
+                    ) if msg_type == "warning" else set()
+                    invalidate_cache_fn()
+                    st.rerun()
+            if has_auto_assets and "sync_time" in st.session_state:
+                st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
+        if st.button(
+            "Compélter mon patrimoine",
+            icon=":material/add:",
+            type="primary",
+            key="btn_add_asset",
+        ):
+            set_dialog_create()
+            st.rerun()
+
+    # ── Liste des actifs ──────────────────────────────────────────────────────
     if df.empty:
-        st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")
+        st.info("Aucun actif enregistré. Utilisez le bouton ＋ pour commencer.")
     else:
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
 
@@ -119,5 +154,13 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                 with st.container(border=True, vertical_alignment="center"):
                     _render_asset_row(row)
             st.space(size="small")
+        st.download_button(
+            "Exporter CSV",
+            data=download_assets(df),
+            file_name="patrimoine.csv",
+            mime="text/csv",
+            icon=":material/download:",
+            key="btn_download",
+        )
 
     return df
