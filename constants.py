@@ -12,13 +12,23 @@ CATEGORIES_AUTO = {"Actions & Fonds", "Crypto"}
 # Catégories à saisie manuelle du montant
 CATEGORIES_MANUAL = {"Livrets", "Immobilier", "Fonds euros"}
 
+# Enveloppes fiscales / supports disponibles
+ENVELOPPES = [
+    "PEA",
+    "CTO",
+    "Assurance vie",
+    "Livret réglementé",
+    "Crypto (wallet/exchange)",
+    "Compte courant",
+]
+
 # Couleur fixe par catégorie (indépendant de l'ordre d'affichage)
 CATEGORY_COLOR_MAP = {
     "Actions & Fonds": "#85357d",
     "Crypto":          "#6f50e5",
     "Livrets":         "#486df0",
-    "Immobilier":      "#E8547A",
-    "Fonds euros":     "#FAEF8B",
+    "Immobilier":      "#d6475d",
+    "Fonds euros":     "#f08696",
 }
 
 PLOTLY_LAYOUT = dict(

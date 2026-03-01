@@ -5,7 +5,7 @@ from filelock import FileLock
 from pandas.errors import EmptyDataError
 from constants import DATA_PATH
 
-COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru"]
+COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
 
 
 def _lock_path(csv_path: str) -> str:
@@ -50,6 +50,11 @@ def load_assets():
             df["quantite"] = 0.0
         if "pru" not in df.columns:
             df["pru"] = 0.0
+        # Migration : nouvelles colonnes courtier et enveloppe
+        if "courtier" not in df.columns:
+            df["courtier"] = ""
+        if "enveloppe" not in df.columns:
+            df["enveloppe"] = ""
         return df
     except (EmptyDataError, FileNotFoundError):
         df = pd.DataFrame(columns=COLUMNS)

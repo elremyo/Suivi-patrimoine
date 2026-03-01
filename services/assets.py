@@ -8,17 +8,16 @@ def get_assets() -> pd.DataFrame:
 
 
 def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
-              ticker: str = "", quantite: float = 0.0, pru: float = 0.0) -> pd.DataFrame:
+              ticker: str = "", quantite: float = 0.0, pru: float = 0.0,
+              courtier: str = "", enveloppe: str = "") -> pd.DataFrame:
     # Pour les actifs auto, le montant initial = PRU × quantité en attendant le premier refresh
     if ticker and quantite > 0 and pru > 0:
         montant = round(pru * quantite, 2)
     asset_id = str(uuid.uuid4())
     new_row = pd.DataFrame(
-        [[asset_id, nom, categorie, montant, ticker, quantite, pru]],
+        [[asset_id, nom, categorie, montant, ticker, quantite, pru, courtier, enveloppe]],
         columns=df.columns
     )
-    # Évite le FutureWarning pandas : concat avec un DataFrame vide
-    # se comportera différemment dans les prochaines versions
     if df.empty:
         df = new_row.reset_index(drop=True)
     else:
@@ -27,13 +26,16 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
 
 
 def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: float,
-                 ticker: str = "", quantite: float = 0.0, pru: float = 0.0) -> pd.DataFrame:
+                 ticker: str = "", quantite: float = 0.0, pru: float = 0.0,
+                 courtier: str = "", enveloppe: str = "") -> pd.DataFrame:
     df.loc[idx, "nom"] = nom
     df.loc[idx, "categorie"] = categorie
     df.loc[idx, "montant"] = montant
     df.loc[idx, "ticker"] = ticker
     df.loc[idx, "quantite"] = quantite
     df.loc[idx, "pru"] = pru
+    df.loc[idx, "courtier"] = courtier
+    df.loc[idx, "enveloppe"] = enveloppe
     return df
 
 

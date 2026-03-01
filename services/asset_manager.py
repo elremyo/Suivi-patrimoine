@@ -28,6 +28,8 @@ def create_auto_asset(
     quantite: float,
     pru: float,
     categorie: str,
+    courtier: str = "",
+    enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
     """
     Crée un actif automatique (Actions & Fonds, Crypto) :
@@ -43,7 +45,8 @@ def create_auto_asset(
         return df, err, "error"
 
     nom = get_name(ticker)
-    df = add_asset(df, nom, categorie, montant=0.0, ticker=ticker, quantite=quantite, pru=pru)
+    df = add_asset(df, nom, categorie, montant=0.0, ticker=ticker, quantite=quantite, pru=pru,
+                   courtier=courtier, enveloppe=enveloppe)
     asset_id = df.iloc[-1]["id"]
     record_position(asset_id, quantite)
     df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
@@ -59,6 +62,8 @@ def create_manual_asset(
     nom: str,
     categorie: str,
     montant: float,
+    courtier: str = "",
+    enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
     """
     Crée un actif manuel (Livrets, Immobilier, Fonds euros) :
@@ -66,7 +71,7 @@ def create_manual_asset(
     2. Enregistre le montant dans l'historique
     3. Sauvegarde sur le disque
     """
-    df = add_asset(df, nom, categorie, montant)
+    df = add_asset(df, nom, categorie, montant, courtier=courtier, enveloppe=enveloppe)
     asset_id = df.iloc[-1]["id"]
     record_montant(asset_id, montant)
     save_assets(df)
@@ -86,6 +91,8 @@ def edit_auto_asset(
     quantite_current: float,
     pru: float,
     categorie: str,
+    courtier: str = "",
+    enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
     """
     Modifie un actif automatique :
@@ -103,7 +110,8 @@ def edit_auto_asset(
     nom = get_name(ticker) if ticker != ticker_current else df.loc[idx, "nom"]
     montant = float(df.loc[idx, "montant"])
 
-    df = update_asset(df, idx, nom, categorie, montant, ticker, quantite, pru)
+    df = update_asset(df, idx, nom, categorie, montant, ticker, quantite, pru,
+                      courtier=courtier, enveloppe=enveloppe)
     if quantite != quantite_current:
         record_position(asset_id, quantite)
     df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
@@ -121,6 +129,8 @@ def edit_manual_asset(
     nom: str,
     categorie: str,
     montant: float,
+    courtier: str = "",
+    enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
     """
     Modifie un actif manuel :
@@ -128,7 +138,8 @@ def edit_manual_asset(
     2. Enregistre le nouveau montant dans l'historique
     3. Sauvegarde sur le disque
     """
-    df = update_asset(df, idx, nom, categorie, montant)
+    df = update_asset(df, idx, nom, categorie, montant,
+                      courtier=courtier, enveloppe=enveloppe)
     record_montant(asset_id, montant)
     save_assets(df)
 

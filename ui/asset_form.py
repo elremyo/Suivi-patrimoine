@@ -29,7 +29,7 @@ from services.asset_manager import (
     remove_asset,
 )
 from services.pricer import validate_ticker, lookup_ticker
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES
 
 
 # ── Gestion de l'état des modales ─────────────────────────────────────────────
@@ -46,7 +46,6 @@ def set_dialog_delete(asset_id: str):
 def _close_dialog():
     """Ferme la modale et nettoie tout l'état du formulaire."""
     st.session_state.pop("_dialog", None)
-    # Nettoie les clés internes du formulaire
     for key in list(st.session_state.keys()):
         if key.startswith("_form_"):
             st.session_state.pop(key, None)
@@ -59,6 +58,25 @@ def _find_row_by_id(df: pd.DataFrame, asset_id: str):
     if matches.empty:
         raise ValueError(f"Actif introuvable (id={asset_id}).")
     return matches.index[0], matches.iloc[0]
+
+
+def _courtier_enveloppe_fields(row=None):
+    """
+    Champs communs courtier + enveloppe, partagés entre formulaires auto et manuel.
+    Retourne (courtier, enveloppe).
+    """
+    initial_courtier  = row.get("courtier",  "") if row is not None else ""
+    initial_enveloppe = row.get("enveloppe", "") if row is not None else ""
+
+    # Si la valeur existante n'est pas dans la liste (ex. migration), on met le premier item
+    enveloppe_index = ENVELOPPES.index(initial_enveloppe) if initial_enveloppe in ENVELOPPES else 0
+
+    courtier  = st.text_input("Courtier / Banque *", value=initial_courtier,
+                               placeholder="ex. Boursorama, Binance, Crédit Agricole",
+                               key="_form_courtier")
+    enveloppe = st.selectbox("Enveloppe *", options=ENVELOPPES,
+                              index=enveloppe_index, key="_form_enveloppe")
+    return courtier, enveloppe
 
 
 # ── Ticker picker ─────────────────────────────────────────────────────────────
@@ -79,16 +97,13 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
         key="_form_ticker_input",
     ).strip().upper()
 
-    # Détecte un changement de ticker et efface l'aperçu
     if st.session_state.get("_form_ticker_last") != ticker_input:
         st.session_state.pop("_form_ticker_preview", None)
         st.session_state["_form_ticker_last"] = ticker_input
 
-    # Édition : ticker inchangé → on fait confiance aux données existantes
     if ticker_input == initial_ticker and initial_ticker != "":
         return {"ticker": ticker_input, "prefilled": True}
 
-    # Bouton de vérification
     if st.button(
         "Vérifier le ticker",
         use_container_width=True,
@@ -105,7 +120,6 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
             else:
                 st.error(f"Ticker « {ticker_input} » introuvable sur yfinance.")
 
-    # Fiche de l'actif trouvé
     if "_form_ticker_preview" in st.session_state:
         preview = st.session_state["_form_ticker_preview"]
         with st.container(border=True):
@@ -141,30 +155,40 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
+    st.divider()
+    courtier, enveloppe = _courtier_enveloppe_fields(row if mode == "edit" else None)
+
     c1, c2 = st.columns(2)
     if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
         _close_dialog()
         st.rerun()
 
     if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
-        effective_ticker = ticker_result["ticker"]
-        if mode == "create":
-            with st.spinner("Ajout en cours…"):
-                df, msg, msg_type = create_auto_asset(df, effective_ticker, quantite, pru, categorie)
+        if not courtier:
+            st.warning("Le courtier / la banque est obligatoire.")
         else:
-            ticker_current   = row.get("ticker", "")
-            quantite_current = float(row.get("quantite") or 0.0)
-            with st.spinner("Synchronisation du prix…"):
-                df, msg, msg_type = edit_auto_asset(
-                    df, idx, row["id"],
-                    effective_ticker, ticker_current,
-                    quantite, quantite_current,
-                    pru, categorie,
-                )
-        flash_fn(msg, msg_type)
-        _close_dialog()
-        invalidate_cache_fn()
-        st.rerun()
+            effective_ticker = ticker_result["ticker"]
+            if mode == "create":
+                with st.spinner("Ajout en cours…"):
+                    df, msg, msg_type = create_auto_asset(
+                        df, effective_ticker, quantite, pru, categorie,
+                        courtier=courtier, enveloppe=enveloppe,
+                    )
+            else:
+                ticker_current   = row.get("ticker", "")
+                quantite_current = float(row.get("quantite") or 0.0)
+                with st.spinner("Synchronisation du prix…"):
+                    df, msg, msg_type = edit_auto_asset(
+                        df, idx, row["id"],
+                        effective_ticker, ticker_current,
+                        quantite, quantite_current,
+                        pru, categorie,
+                        courtier=courtier, enveloppe=enveloppe,
+                    )
+            flash_fn(msg, msg_type)
+            _close_dialog()
+            invalidate_cache_fn()
+            st.rerun()
 
     return df
 
@@ -185,6 +209,9 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
+    st.divider()
+    courtier, enveloppe = _courtier_enveloppe_fields(row if mode == "edit" else None)
+
     c1, c2 = st.columns(2)
     if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
         _close_dialog()
@@ -193,11 +220,19 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
         if not nom:
             st.warning("Le nom est obligatoire.")
+        elif not courtier:
+            st.warning("Le courtier / la banque est obligatoire.")
         else:
             if mode == "create":
-                df, msg, msg_type = create_manual_asset(df, nom, categorie, montant)
+                df, msg, msg_type = create_manual_asset(
+                    df, nom, categorie, montant,
+                    courtier=courtier, enveloppe=enveloppe,
+                )
             else:
-                df, msg, msg_type = edit_manual_asset(df, idx, row["id"], nom, categorie, montant)
+                df, msg, msg_type = edit_manual_asset(
+                    df, idx, row["id"], nom, categorie, montant,
+                    courtier=courtier, enveloppe=enveloppe,
+                )
             flash_fn(msg, msg_type)
             _close_dialog()
             invalidate_cache_fn()
@@ -214,7 +249,7 @@ def _cancel_button():
 
 # ── Modales Streamlit ─────────────────────────────────────────────────────────
 
-@st.dialog("Actif",dismissible=False)
+@st.dialog("Actif", dismissible=False)
 def _dialog_create(df, invalidate_cache_fn, flash_fn):
     st.markdown("### Ajouter un actif")
     is_auto = st.toggle("Actif financier (ticker)", value=True, key="_form_is_auto")
@@ -224,7 +259,7 @@ def _dialog_create(df, invalidate_cache_fn, flash_fn):
         _form_manual(df, "create", None, None, invalidate_cache_fn, flash_fn)
 
 
-@st.dialog("Actif",dismissible=False)
+@st.dialog("Actif", dismissible=False)
 def _dialog_edit(df, asset_id, invalidate_cache_fn, flash_fn):
     try:
         idx, row = _find_row_by_id(df, asset_id)
@@ -242,7 +277,7 @@ def _dialog_edit(df, asset_id, invalidate_cache_fn, flash_fn):
         _form_manual(df, "edit", idx, row, invalidate_cache_fn, flash_fn)
 
 
-@st.dialog("Supprimer un actif",dismissible=False)
+@st.dialog("Supprimer un actif", dismissible=False)
 def _dialog_delete(df, asset_id, invalidate_cache_fn, flash_fn):
     try:
         idx, row = _find_row_by_id(df, asset_id)
@@ -264,7 +299,6 @@ def _dialog_delete(df, asset_id, invalidate_cache_fn, flash_fn):
         _close_dialog()
         invalidate_cache_fn()
         st.rerun()
-
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────

@@ -20,21 +20,34 @@ def _render_asset_row(row: pd.Series):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
     cols = st.columns([4, 2, 2, 2, 1, 1])
 
+    # ── Colonne nom + infos discrètes ─────────────────────────────────────────
+    courtier  = str(row.get("courtier",  "") or "").strip()
+    enveloppe = str(row.get("enveloppe", "") or "").strip()
+    meta_parts = [p for p in [courtier, enveloppe] if p]
+    meta_str   = " · ".join(meta_parts)  # ex. "Boursorama · PEA"
+
     if is_auto_row and row.get("ticker"):
-        # Récupère les tickers en erreur depuis la session
         error_tickers = st.session_state.get("sync_error_tickers", set())
         ticker = row["ticker"]
         sync_dot = " 🔴" if ticker in error_tickers else " 🟢"
+        ticker_line = f"{ticker}{sync_dot}"
+        if meta_str:
+            ticker_line += f" · {meta_str}"
         cols[0].write(row["nom"])
-        cols[0].caption(f'{ticker} {sync_dot}')
+        cols[0].caption(ticker_line)
     else:
         cols[0].write(row["nom"])
+        if meta_str:
+            cols[0].caption(meta_str)
 
+    # ── Quantité (actifs auto uniquement) ─────────────────────────────────────
     if is_auto_row:
         cols[1].caption(f'{row["quantite"]:g} unités')
 
+    # ── Montant ───────────────────────────────────────────────────────────────
     cols[2].write(f"{row['montant']:,.2f} €")
 
+    # ── PnL (actifs auto avec PRU) ────────────────────────────────────────────
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
         valeur_achat = row["pru"] * row["quantite"]
         pnl = row["montant"] - valeur_achat
@@ -44,6 +57,7 @@ def _render_asset_row(row: pd.Series):
         sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
         cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
+    # ── Boutons ───────────────────────────────────────────────────────────────
     if cols[4].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
         set_dialog_edit(row["id"])
         st.rerun()
@@ -61,7 +75,7 @@ def _render_pie_chart(df: pd.DataFrame):
     if stats.empty:
         return
 
-    st.subheader("Répartition par catégorie",anchor=False)
+    st.subheader("Répartition par catégorie", anchor=False)
     fig = go.Figure(go.Pie(
         labels=stats["categorie"],
         values=stats["montant"],
@@ -91,7 +105,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     if "prices_refreshed" not in st.session_state and has_auto_assets:
         with st.spinner("Actualisation des prix en cours…"):
             df, msg, msg_type = refresh_prices(df)
-        # Stocke l'heure et les erreurs de synchro
         st.session_state["prices_refreshed"] = True
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set(
@@ -109,7 +122,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
 
-    # Indicateur de synchro global — discret, sous le total
     if has_auto_assets and "sync_time" in st.session_state:
         st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
@@ -118,7 +130,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     if df.empty:
         st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")
     else:
-        # Affichage groupé par catégorie, dans l'ordre défini dans CATEGORIES_ASSETS
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
 
         for categorie in categories_presentes:
