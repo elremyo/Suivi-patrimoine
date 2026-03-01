@@ -1,7 +1,7 @@
 """
 ui/tab_actifs.py
 ───────────────────
-Contenu du tab "📋 Actifs" : liste des actifs groupés par catégorie, total patrimoine, camembert.
+Contenu du tab "📋 Actifs" : liste des actifs, total patrimoine, camembert.
 Les modales sont gérées via ui/asset_form.py.
 """
 
@@ -14,22 +14,26 @@ from ui.asset_form import set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
 
 
-# ── Ligne d'actif (dans le détail d'une catégorie) ───────────────────────────
+# ── Ligne d'actif ─────────────────────────────────────────────────────────────
 
 def _render_asset_row(row: pd.Series):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 0.5, 0.5])
+    cols = st.columns([4, 2, 2, 2, 1, 1])
 
     if is_auto_row and row.get("ticker"):
+        # Récupère les tickers en erreur depuis la session
         error_tickers = st.session_state.get("sync_error_tickers", set())
         ticker = row["ticker"]
         sync_dot = " 🔴" if ticker in error_tickers else " 🟢"
         cols[0].write(row["nom"])
-        cols[0].caption(f'{ticker} · {row["quantite"]:g} unités{sync_dot}')
+        cols[0].caption(f'{ticker} {sync_dot}')
     else:
         cols[0].write(row["nom"])
 
-    cols[1].write(f"{row['montant']:,.2f} €")
+    if is_auto_row:
+        cols[1].caption(f'{row["quantite"]:g} unités')
+
+    cols[2].write(f"{row['montant']:,.2f} €")
 
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
         valeur_achat = row["pru"] * row["quantite"]
@@ -38,74 +42,16 @@ def _render_asset_row(row: pd.Series):
         sign_color = "green" if pnl >= 0 else "red"
         sign = "+" if pnl >= 0 else ""
         sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
-        cols[2].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
-    else:
-        cols[2].write("")
+        cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
-    if cols[3].button("", key=f"mod_{row['id']}", icon=":material/edit_square:",type="tertiary", icon_position="right"):
+    if cols[4].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
         set_dialog_edit(row["id"])
         st.rerun()
 
-    if cols[4].button("", key=f"del_{row['id']}", icon=":material/delete:",type="tertiary", icon_position="right"):
+    if cols[5].button("", key=f"del_{row['id']}", icon=":material/delete:"):
         set_dialog_delete(row["id"])
         st.rerun()
 
-
-# ── Bloc catégorie (expander) ─────────────────────────────────────────────────
-
-def _render_category_block(categorie: str, df_cat: pd.DataFrame, total_patrimoine: float):
-    """Affiche un expander pour une catégorie avec ses stats et ses actifs."""
-
-    # ── Calculs ───────────────────────────────────────────────────────────────
-    montant_cat = df_cat["montant"].sum()
-    nb_actifs   = len(df_cat)
-    pct         = (montant_cat / total_patrimoine * 100) if total_patrimoine else 0
-
-    # P&L uniquement pour les catégories auto
-    pnl_str = ""
-    if categorie in CATEGORIES_AUTO:
-        mask_pnl = (df_cat["quantite"] > 0) & (df_cat["pru"] > 0)
-        if mask_pnl.any():
-            valeur_achat = (df_cat.loc[mask_pnl, "pru"] * df_cat.loc[mask_pnl, "quantite"]).sum()
-            pnl_total    = df_cat.loc[mask_pnl, "montant"].sum() - valeur_achat
-            pnl_pct      = (pnl_total / valeur_achat * 100) if valeur_achat else 0
-            sign         = "+" if pnl_total >= 0 else ""
-            pnl_color    = "green" if pnl_total >= 0 else "red"
-            pnl_icon     = ":material/trending_up:" if pnl_total >= 0 else ":material/trending_down:"
-            pnl_str      = f":{pnl_color}-badge[{pnl_icon} {sign}{pnl_total:,.0f} € ({sign}{pnl_pct:.1f}%)]"
-
-    # ── Toggle état ouvert/fermé ──────────────────────────────────────────────
-    state_key = f"cat_expanded_{categorie}"
-    if state_key not in st.session_state:
-        st.session_state[state_key] = False
-    is_open = st.session_state[state_key]
-
-    # ── Header cliquable ──────────────────────────────────────────────────────
-    color = CATEGORY_COLOR_MAP.get(categorie, "#CCCCCC")
-    actifs_label = "actif" if nb_actifs == 1 else "actifs"
-
-    with st.container(border=True):
-        cols = st.columns([4, 2, 2, 0.5, 0.5])
-        puce_coloree = f"<span style='color:{color}; font-size:1.2em;'>●</span>"
-        badge_actifs = f":gray-badge[{nb_actifs} {actifs_label}]"
-
-        cols[0].markdown(f"{puce_coloree} **{categorie}** {badge_actifs}", unsafe_allow_html=True)
-        cols[1].markdown(f"**{montant_cat:,.0f} €**")
-        #cols[2].markdown(f":gray[{pct:.1f} %]")
-        cols[2].markdown(pnl_str if pnl_str else "")
-
-        chevron = ":material/keyboard_arrow_up:" if is_open else ":material/keyboard_arrow_down:"
-        cols[3].empty()
-        if cols[4].button("", key=f"toggle_{categorie}", icon=chevron,type="secondary"):
-            st.session_state[state_key] = not is_open
-            st.rerun()
-
-        # ── Détail des actifs ─────────────────────────────────────────────────
-        if is_open:
-            for _, row in df_cat.iterrows():
-                with st.container(border=True):
-                    _render_asset_row(row)
-                
 
 # ── Graphique camembert ───────────────────────────────────────────────────────
 
@@ -115,7 +61,7 @@ def _render_pie_chart(df: pd.DataFrame):
     if stats.empty:
         return
 
-    st.subheader("Répartition par catégorie", anchor=False)
+    st.subheader("Répartition par catégorie",anchor=False)
     fig = go.Figure(go.Pie(
         labels=stats["categorie"],
         values=stats["montant"],
@@ -142,10 +88,10 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         and df["ticker"].notna().any()
         and (df["ticker"] != "").any()
     )
-
     if "prices_refreshed" not in st.session_state and has_auto_assets:
         with st.spinner("Actualisation des prix en cours…"):
             df, msg, msg_type = refresh_prices(df)
+        # Stocke l'heure et les erreurs de synchro
         st.session_state["prices_refreshed"] = True
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set(
@@ -160,27 +106,34 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set()
 
-    # ── Total patrimoine ──────────────────────────────────────────────────────
     total = compute_total(df)
     st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
 
+    # Indicateur de synchro global — discret, sous le total
     if has_auto_assets and "sync_time" in st.session_state:
         st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
     st.space(size="small")
 
-    # ── Liste groupée par catégorie ───────────────────────────────────────────
     if df.empty:
         st.info("Aucun actif enregistré. Utilisez le bouton « Ajouter un actif » pour commencer.")
     else:
-        # On respecte l'ordre défini dans CATEGORIES_ASSETS
+        # Affichage groupé par catégorie, dans l'ordre défini dans CATEGORIES_ASSETS
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
 
         for categorie in categories_presentes:
-            df_cat = df[df["categorie"] == categorie].reset_index(drop=True)
-            _render_category_block(categorie, df_cat, total)
+            category_color = CATEGORY_COLOR_MAP.get(categorie, "#CCCCCC")
+            st.markdown(
+                f"<span style='color:{category_color}; font-size:0.85em;'>●</span> "
+                f"<span style='color:{category_color}; font-size:0.85em; text-transform:uppercase; letter-spacing:0.08em;'>{categorie}</span>",
+                unsafe_allow_html=True,
+            )
+            df_cat = df[df["categorie"] == categorie]
+            for _, row in df_cat.iterrows():
+                with st.container(border=True, vertical_alignment="center"):
+                    _render_asset_row(row)
+            st.space(size="small")
 
-    st.space(size="small")
     _render_pie_chart(df)
 
     return df

@@ -22,7 +22,7 @@ CATEGORY_COLOR_MAP = {
     "Crypto":          "#6f50e5",
     "Livrets":         "#486df0",
     "Immobilier":      "#E8547A",
-    "Fonds euros":     "#A78BFA",
+    "Fonds euros":     "#FAEF8B",
 }
 
 PLOTLY_LAYOUT = dict(
