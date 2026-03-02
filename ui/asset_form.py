@@ -60,22 +60,26 @@ def _find_row_by_id(df: pd.DataFrame, asset_id: str):
     return matches.index[0], matches.iloc[0]
 
 
-def _courtier_enveloppe_fields(row=None):
+def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
     """
     Champs communs courtier + enveloppe, partagés entre formulaires auto et manuel.
+    show_enveloppe=False pour l'immobilier détenu en direct (pas d'enveloppe fiscale).
     Retourne (courtier, enveloppe).
     """
     initial_courtier  = row.get("courtier",  "") if row is not None else ""
     initial_enveloppe = row.get("enveloppe", "") if row is not None else ""
 
-    # Si la valeur existante n'est pas dans la liste (ex. migration), on met le premier item
-    enveloppe_index = ENVELOPPES.index(initial_enveloppe) if initial_enveloppe in ENVELOPPES else 0
+    courtier = st.text_input("Courtier / Banque *", value=initial_courtier,
+                              placeholder="ex. Boursorama, Binance, Crédit Agricole",
+                              key="_form_courtier")
 
-    courtier  = st.text_input("Courtier / Banque *", value=initial_courtier,
-                               placeholder="ex. Boursorama, Binance, Crédit Agricole",
-                               key="_form_courtier")
-    enveloppe = st.selectbox("Enveloppe *", options=ENVELOPPES,
-                              index=enveloppe_index, key="_form_enveloppe")
+    if show_enveloppe:
+        enveloppe_index = ENVELOPPES.index(initial_enveloppe) if initial_enveloppe in ENVELOPPES else 0
+        enveloppe = st.selectbox("Enveloppe *", options=ENVELOPPES,
+                                 index=enveloppe_index, key="_form_enveloppe")
+    else:
+        enveloppe = ""
+
     return courtier, enveloppe
 
 
@@ -214,7 +218,10 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     )
 
     st.divider()
-    courtier, enveloppe = _courtier_enveloppe_fields(row if mode == "edit" else None)
+    courtier, enveloppe = _courtier_enveloppe_fields(
+        row if mode == "edit" else None,
+        show_enveloppe=(categorie != "Immobilier"),
+    )
 
     c1, c2 = st.columns(2)
     if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
