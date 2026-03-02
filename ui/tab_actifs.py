@@ -260,39 +260,18 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
 
     st.caption("👤 **Thomas Mercier** — profil diversifié ~200 000 €  \nLivrets · PEA · CTO · Crypto · Assurance vie · SCPI")
 
-    col_demo1, col_demo2 = st.columns(2)
+    demo_actif = is_demo_mode()
+    nouveau_state = st.toggle("Activer les données fictives", value=demo_actif, key="toggle_demo")
 
-    with col_demo1:
-        demo_actif = is_demo_mode()
-        if not demo_actif:
-            if st.button(
-                "Tester les données fictives",
-                icon=":material/person_play:",
-                use_container_width=True,
-                key="btn_activate_demo",
-            ):
-                msg = activate_demo()
-
-                flash_fn(msg, "success")
-                st.cache_data.clear()
-                invalidate_cache_fn()
-                st.rerun()
+    if nouveau_state != demo_actif:
+        if nouveau_state:
+            msg = activate_demo()
         else:
-            st.info("Mode démo actif", icon="🎭")
-
-    with col_demo2:
-        if is_demo_mode() and has_backup():
-            if st.button(
-                "Revenir à mes données",
-                icon=":material/undo:",
-                use_container_width=True,
-                key="btn_deactivate_demo",
-            ):
-                msg = deactivate_demo()
-                flash_fn(msg, "success")
-                st.cache_data.clear()
-                invalidate_cache_fn()
-                st.rerun()
+            msg = deactivate_demo()
+        flash_fn(msg, "success")
+        st.cache_data.clear()
+        invalidate_cache_fn()
+        st.rerun()
 
     # ── Réinitialisation ──────────────────────────────────────────────────
     st.space()

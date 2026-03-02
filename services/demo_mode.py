@@ -71,27 +71,22 @@ def activate_demo() -> str:
 
 
 def deactivate_demo() -> str:
-    """
-    Désactive le mode démo :
-    - Restaure les données perso depuis data/data_backup/
-    - Supprime data/data_backup/
-    - Écrit le marqueur .mode = perso
-    """
-    if not has_backup():
-        return "Aucune donnée personnelle à restaurer."
+    if has_backup():
+        for f in FICHIERS:
+            src = os.path.join(BACKUP_DIR, f)
+            dst = os.path.join(DATA_DIR, f)
+            if os.path.exists(src):
+                shutil.copy2(src, dst)
+        shutil.rmtree(BACKUP_DIR, ignore_errors=True)
+        msg = "Vos données personnelles ont été restaurées. ✅"
+    else:
+        msg = "Mode démo désactivé."
 
-    for f in FICHIERS:
-        src = os.path.join(BACKUP_DIR, f)
-        dst = os.path.join(DATA_DIR, f)
-        if os.path.exists(src):
-            shutil.copy2(src, dst)
-
-    shutil.rmtree(BACKUP_DIR, ignore_errors=True)
-
+    # Toujours écrire "perso" — même sans backup
     with open(MODE_FILE, "w") as fp:
         fp.write("perso")
 
-    return "Vos données personnelles ont été restaurées. ✅"
+    return msg
 
 
 def reset_all_data() -> str:
