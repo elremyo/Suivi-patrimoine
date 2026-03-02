@@ -16,7 +16,8 @@ from services.storage import (
     import_assets, import_historique, import_positions,
 )
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
+from services.demo_mode import DEMO_DIR, is_demo_mode, has_backup, has_personal_data, activate_demo, deactivate_demo, reset_all_data
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
@@ -252,5 +253,68 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
 
     # ── Sauvegarde ────────────────────────────────────────────────────────────
     _render_backup_section(df, invalidate_cache_fn, flash_fn)
+
+    # ── Données fictives ──────────────────────────────────────────────────
+    st.space()
+    st.subheader("Données fictives", anchor=False)
+
+    st.caption("👤 **Thomas Mercier** — profil diversifié ~200 000 €  \nLivrets · PEA · CTO · Crypto · Assurance vie · SCPI")
+
+    col_demo1, col_demo2 = st.columns(2)
+
+    with col_demo1:
+        demo_actif = is_demo_mode()
+        if not demo_actif:
+            if st.button(
+                "Tester les données fictives",
+                icon=":material/person_play:",
+                use_container_width=True,
+                key="btn_activate_demo",
+            ):
+                msg = activate_demo()
+
+                flash_fn(msg, "success")
+                st.cache_data.clear()
+                invalidate_cache_fn()
+                st.rerun()
+        else:
+            st.info("Mode démo actif", icon="🎭")
+
+    with col_demo2:
+        if is_demo_mode() and has_backup():
+            if st.button(
+                "Revenir à mes données",
+                icon=":material/undo:",
+                use_container_width=True,
+                key="btn_deactivate_demo",
+            ):
+                msg = deactivate_demo()
+                flash_fn(msg, "success")
+                st.cache_data.clear()
+                invalidate_cache_fn()
+                st.rerun()
+
+    # ── Réinitialisation ──────────────────────────────────────────────────
+    st.space()
+    st.subheader("Réinitialisation", anchor=False)
+    st.warning("⚠️ Supprime définitivement toutes les données (actifs, historique, positions).")
+
+    confirm_input = st.text_input(
+        "Tapez **SUPPRIMER** pour confirmer",
+        placeholder="SUPPRIMER",
+        key="reset_confirm_input",
+    )
+    if st.button(
+        "Tout supprimer",
+        icon=":material/delete_forever:",
+        type="primary",
+        disabled=(confirm_input != "SUPPRIMER"),
+        key="btn_reset_all",
+    ):
+        msg = reset_all_data()
+        flash_fn(msg, "success")
+        st.cache_data.clear()
+        invalidate_cache_fn()
+        st.rerun()
 
     return df

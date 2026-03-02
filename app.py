@@ -6,20 +6,21 @@ Point d'entrée de l'application Streamlit.
 
 import streamlit as st
 import pandas as pd
-from services.storage import init_storage, download_assets
+from services.storage import init_storage
 from services.assets import get_assets
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
 from services.positions import init_positions, load_positions
-from services.asset_manager import refresh_prices
 from ui.tab_actifs import render as render_actifs
 from ui.tab_historique import render as render_historique
 from ui.tab_repartition import render as render_repartition
-from ui.asset_form import set_dialog_create, render_active_dialog
-from constants import CATEGORIES_AUTO
-from datetime import datetime
+from ui.asset_form import render_active_dialog
+from services.demo_mode import is_demo_mode
 
 
-st.set_page_config(page_title="Suivi Patrimoine", layout="wide", page_icon=":material/finance_mode:")
+st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:")
+
+demo_suffix = "  🎭 *Démo*" if is_demo_mode() else ""
+st.write(f"Bienvenue sur votre suivi de patrimoine{demo_suffix} !")
 
 init_storage()
 init_historique()
