@@ -14,6 +14,7 @@ from ui.tab_actifs import render as render_actifs
 from ui.tab_historique import render as render_historique
 from ui.tab_repartition import render as render_repartition
 from ui.asset_form import render_active_dialog
+from ui.sidebar import render as render_sidebar
 from services.demo_mode import is_demo_mode
 
 
@@ -64,6 +65,11 @@ def show_flash():
         st.toast(f["msg"], icon=icons.get(f["type"], "ℹ️"))
 
 
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+
+render_sidebar(df, invalidate_data_cache, flash)
+
+
 # ── Modales ───────────────────────────────────────────────────────────────────
 
 render_active_dialog(df, invalidate_data_cache, flash)
@@ -75,13 +81,10 @@ show_flash()
 
 st.logo(image=":material/finance_mode:", size="large", icon_image=":material/finance_mode:")
 
-
-st.title(f"Suivi de patrimoine", anchor=False)
+st.title("Suivi de patrimoine", anchor=False)
 
 if is_demo_mode():
-    st.info("Mode démo",icon="👀")
-
-
+    st.info("Mode démo", icon="👀")
 
 tab_actifs, tab_repartition, tab_historique = st.tabs(["📋 Actifs", "📊 Répartition", "📈 Historique"])
 

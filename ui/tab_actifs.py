@@ -4,21 +4,15 @@ ui/tab_actifs.py
 Contenu du tab "📋 Actifs" : liste des actifs, total patrimoine.
 Les modales sont gérées via ui/asset_form.py.
 Les graphiques de répartition sont dans ui/tab_repartition.py.
+Les exports, imports, mode démo et réinitialisation sont dans ui/sidebar.py.
 """
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 from datetime import datetime
 from services.asset_manager import refresh_prices
-from services.storage import (
-    download_assets, download_historique, download_positions,
-    import_assets, import_historique, import_positions,
-)
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
-from services.demo_mode import DEMO_DIR, is_demo_mode, has_backup, has_personal_data, activate_demo, deactivate_demo, reset_all_data
-from constants import DEMO_USER_NAME
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
@@ -75,88 +69,6 @@ def _render_asset_row(row: pd.Series):
     if cols[5].button("", key=f"del_{row['id']}", icon=":material/delete:"):
         set_dialog_delete(row["id"])
         st.rerun()
-
-
-# ── Section sauvegarde ────────────────────────────────────────────────────────
-
-def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
-    """Affiche les boutons d'export et les zones d'import en bas de l'onglet."""
-    st.space("small")
-    st.subheader("Gestion des données", anchor=False)
-
-    # ── Export ────────────────────────────────────────────────────────────────
-    st.markdown("**Téléchargements** (.csv)")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        #st.markdown("**Actifs**")
-        st.download_button(
-            "Liste des actifs",
-            data=download_assets(df),
-            file_name="sauvegarde_actifs.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True,
-            key="btn_dl_assets",
-            help="La liste de tes actifs : nom, catégorie, montant, ticker…",
-        )
-    with col2:
-        #st.markdown("**Historique des montants**")
-        st.download_button(
-            "Historique des montants",
-            data=download_historique(),
-            file_name="sauvegarde_historique.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True,
-            key="btn_dl_historique",
-            help="L'évolution des montants dans le temps pour tes actifs manuels (livrets, immo…)",
-        )
-    with col3:
-        #st.markdown("**Historique des positions**")
-        st.download_button(
-            "Historique des positions",
-            data=download_positions(),
-            file_name="sauvegarde_positions.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True,
-            key="btn_dl_positions",
-            help="L'évolution des quantités dans le temps pour tes actions et cryptos",
-        )
-    # ── Import ────────────────────────────────────────────────────────────────
-    st.space()
-    st.markdown("**Imports** - :orange[:material/warning: Remplace toutes les données existantes. Action irréversible !]")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        f = st.file_uploader("Importer mes actifs", type="csv",
-                             key=f"up_assets_{st.session_state.get('_up_assets_v', 0)}")
-        if f:
-            ok, msg = import_assets(f)
-            flash_fn(msg, "success" if ok else "error")
-            st.session_state["_up_assets_v"] = st.session_state.get("_up_assets_v", 0) + 1
-            if ok:
-                invalidate_cache_fn()
-            st.rerun()
-    with col2:
-        f = st.file_uploader("Importer mon historique", type="csv",
-                             key=f"up_historique_{st.session_state.get('_up_historique_v', 0)}")
-        if f:
-            ok, msg = import_historique(f)
-            flash_fn(msg, "success" if ok else "error")
-            st.session_state["_up_historique_v"] = st.session_state.get("_up_historique_v", 0) + 1
-            if ok:
-                invalidate_cache_fn()
-            st.rerun()
-    with col3:
-        f = st.file_uploader("Importer mes positions", type="csv",
-                             key=f"up_positions_{st.session_state.get('_up_positions_v', 0)}")
-        if f:
-            ok, msg = import_positions(f)
-            flash_fn(msg, "success" if ok else "error")
-            st.session_state["_up_positions_v"] = st.session_state.get("_up_positions_v", 0) + 1
-            if ok:
-                invalidate_cache_fn()
-            st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
@@ -243,12 +155,8 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                 st.rerun()
             st.divider()
             st.markdown("🎮 **Pas encore prêt à saisir tes données ?**")
-            st.caption("Active le mode démo en bas de page pour explorer l'app avec des données fictives sur un an !")
+            st.caption("Active le mode démo dans la barre latérale pour explorer l'app avec des données fictives !")
             st.markdown(" ")
-
-
-
-
 
     else:
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
@@ -266,55 +174,4 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                     _render_asset_row(row)
             st.space(size="small")
 
-    # ── Gestion des données ────────────────────────────────────────────────────────────
-    if not df.empty:
-        _render_backup_section(df, invalidate_cache_fn, flash_fn)
-
-    # ── Données fictives ──────────────────────────────────────────────────
-    st.space()
-    st.subheader("Mode démo", anchor=False)
-
-    st.markdown(f":material/person: **{DEMO_USER_NAME}** - profil diversifié ~200 000 €")
-    st.caption("Livrets · PEA · CTO · Crypto · Assurance vie · SCPI")
-
-    demo_actif = is_demo_mode()
-    help_demo = "Active une simulation avec des données fictives sur un an, pour explorer l'app et ses fonctionnalités sans saisir tes propres données. Idéal pour tester les graphiques de répartition et d'évolution dans le temps !"
-    nouveau_state = st.toggle("Activer les données fictives", value=demo_actif, key="toggle_demo",help=help_demo)
-
-    if nouveau_state != demo_actif:
-        if nouveau_state:
-            msg = activate_demo()
-            st.session_state.pop("prices_refreshed", None)
-        else:
-            msg = deactivate_demo()
-        flash_fn(msg, "success")
-        st.cache_data.clear()
-        invalidate_cache_fn()
-        st.rerun()
-
-    # ── Réinitialisation ──────────────────────────────────────────────────
-    
-    if not df.empty and not is_demo_mode():
-        st.space()
-        st.subheader("Réinitialisation", anchor=False)
-        st.warning("⚠️ Supprime définitivement toutes les données (actifs, historique, positions).")
-
-        confirm_input = st.text_input(
-            "Tapez **SUPPRIMER** pour confirmer",
-            placeholder="SUPPRIMER",
-            key="reset_confirm_input",
-        )
-        if st.button(
-            "Tout supprimer",
-            icon=":material/delete_forever:",
-            type="primary",
-            disabled=(confirm_input != "SUPPRIMER"),
-            key="btn_reset_all",
-        ):
-            msg = reset_all_data()
-            flash_fn(msg, "success")
-            st.cache_data.clear()
-            invalidate_cache_fn()
-            st.rerun()
-
-        return df
+    return df
