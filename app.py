@@ -84,7 +84,7 @@ st.logo(image=":material/finance_mode:", size="large", icon_image=":material/fin
 st.title("Suivi de patrimoine", anchor=False)
 
 if is_demo_mode():
-    st.info("Mode démo. Pour le quitter, utilise le menu de gauche.", icon="👀")
+    st.info("Mode démo. Pour le quitter, utilisez le menu de gauche.", icon="👀")
 
 tab_actifs, tab_repartition, tab_historique = st.tabs(["📋 Actifs", "📊 Répartition", "📈 Historique"])
 

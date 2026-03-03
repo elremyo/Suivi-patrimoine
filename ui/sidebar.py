@@ -18,37 +18,39 @@ from services.demo_mode import (
     DEMO_USER_NAME,
 )
 
+def render_demo_mode_section(invalidate_cache_fn, flash_fn):
+    st.subheader("Mode démo", anchor=False)
+    st.markdown(f":material/person: **{DEMO_USER_NAME}**")
+    st.caption("Profil diversifié ~200 000 € \n\n Livrets · PEA · CTO · Crypto · Assurance vie · SCPI")
+    demo_actif = is_demo_mode()
+    nouveau_state = st.toggle(
+        "Activer les données fictives",
+        value=demo_actif,
+        key="toggle_demo",
+        help="Explore l'app avec des données fictives sur un an, sans saisir tes propres données.",
+    )
+    if nouveau_state != demo_actif:
+        if nouveau_state:
+            msg = activate_demo()
+            st.session_state.pop("prices_refreshed", None)
+        else:
+            msg = deactivate_demo()
+        flash_fn(msg, "success")
+        st.cache_data.clear()
+        invalidate_cache_fn()
+        st.rerun()
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     with st.sidebar:
-
-        # ── Mode démo ─────────────────────────────────────────────────────────
-        st.subheader("Mode démo", anchor=False)
-        st.markdown(f":material/person: **{DEMO_USER_NAME}**")
-        st.caption("Profil diversifié ~200 000 € · Livrets · PEA · CTO · Crypto · Assurance vie · SCPI")
-
-        demo_actif = is_demo_mode()
-        nouveau_state = st.toggle(
-            "Activer les données fictives",
-            value=demo_actif,
-            key="toggle_demo",
-            help="Explore l'app avec des données fictives sur un an, sans saisir tes propres données.",
-        )
-        if nouveau_state != demo_actif:
-            if nouveau_state:
-                msg = activate_demo()
-                st.session_state.pop("prices_refreshed", None)
-            else:
-                msg = deactivate_demo()
-            flash_fn(msg, "success")
-            st.cache_data.clear()
-            invalidate_cache_fn()
-            st.rerun()
+        if df.empty or is_demo_mode() or not has_personal_data():
+            with st.expander("Mode démo", expanded=True):
+                render_demo_mode_section(invalidate_cache_fn, flash_fn)
+        else:
+            with st.expander("Mode démo"):
+                render_demo_mode_section(invalidate_cache_fn, flash_fn)
 
         # ── Export & Import (visibles uniquement si des données existent) ─────
         if not df.empty:
-            st.divider()
-
             st.subheader("Télécharger mes données", anchor=False)
             st.download_button(
                 "Liste des actifs",
@@ -80,8 +82,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
                 key="btn_dl_positions",
                 help="Évolution des quantités dans le temps (actions, cryptos).",
             )
-
-            st.divider()
 
             st.subheader("Importer des données", anchor=False)
             st.caption(":orange[:material/warning: Remplace toutes les données existantes.]")
@@ -127,25 +127,25 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
 
         # ── Réinitialisation (visible uniquement si données perso) ────────────
         if not df.empty and not is_demo_mode():
-            st.divider()
-            st.subheader("Réinitialisation", anchor=False)
-            st.warning("Supprime définitivement toutes les données.")
+            with st.expander("Supprimer mes données"):
+                st.warning("Supprime définitivement toutes vos données. Irréversible !", icon=":material/warning:")
 
-            confirm_input = st.text_input(
-                "Tapez **SUPPRIMER** pour confirmer",
-                placeholder="SUPPRIMER",
-                key="reset_confirm_input",
-            )
-            if st.button(
-                "Tout supprimer",
-                icon=":material/delete_forever:",
-                type="primary",
-                disabled=(confirm_input != "SUPPRIMER"),
-                use_container_width=True,
-                key="btn_reset_all",
-            ):
-                msg = reset_all_data()
-                flash_fn(msg, "success")
-                st.cache_data.clear()
-                invalidate_cache_fn()
-                st.rerun()
+                confirm_input = st.text_input(
+                    "Tapez **SUPPRIMER** pour confirmer",
+                    placeholder="SUPPRIMER",
+                    key="reset_confirm_input",
+                )
+                if st.button(
+                    "Tout supprimer",
+                    icon=":material/delete_forever:",
+                    type="primary",
+                    disabled=confirm_input != "SUPPRIMER",
+                    use_container_width=True,
+                    key="btn_reset_all",
+                ):
+                    msg = reset_all_data()
+                    flash_fn(msg, "success")
+                    st.cache_data.clear()
+                    invalidate_cache_fn()
+                    st.rerun()
+                
