@@ -7,6 +7,7 @@ Gestion du mode démo : activation, désactivation, reset complet.
 import os
 import shutil
 import pandas as pd
+from constants import DEMO_USER_NAME
 
 _ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -48,10 +49,10 @@ def activate_demo() -> str:
     - Copie les données fictives dans data/
     - Écrit le marqueur .mode = demo
     """
-    os.makedirs(BACKUP_DIR, exist_ok=True)
     os.makedirs(DATA_DIR, exist_ok=True)
 
     if has_personal_data():
+        os.makedirs(BACKUP_DIR, exist_ok=True)
         for f in FICHIERS:
             src = os.path.join(DATA_DIR, f)
             dst = os.path.join(BACKUP_DIR, f)
@@ -67,10 +68,17 @@ def activate_demo() -> str:
     with open(MODE_FILE, "w") as fp:
         fp.write("demo")
 
-    return "Données fictives chargées. Bienvenue chez Thomas Mercier 👋"
+    return f"Données fictives chargées. Bienvenue chez {DEMO_USER_NAME} 👋"
 
 
 def deactivate_demo() -> str:
+    print("BACKUP_DIR:", BACKUP_DIR)
+    print("BACKUP_DIR exists:", os.path.exists(BACKUP_DIR))
+    print("has_backup():", has_backup())
+    for f in FICHIERS:
+        p = os.path.join(BACKUP_DIR, f)
+        print(f, "→", os.path.exists(p))
+
     if has_backup():
         for f in FICHIERS:
             src = os.path.join(BACKUP_DIR, f)
@@ -78,8 +86,12 @@ def deactivate_demo() -> str:
             if os.path.exists(src):
                 shutil.copy2(src, dst)
         shutil.rmtree(BACKUP_DIR, ignore_errors=True)
-        msg = "Vos données personnelles ont été restaurées. ✅"
+        msg = "Vos données personnelles ont été restaurées."
     else:
+        for f in FICHIERS:
+            path = os.path.join(DATA_DIR, f)
+            if os.path.exists(path):
+                os.remove(path)
         msg = "Mode démo désactivé."
 
     # Toujours écrire "perso" — même sans backup

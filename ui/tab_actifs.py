@@ -18,6 +18,7 @@ from services.storage import (
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
 from services.demo_mode import DEMO_DIR, is_demo_mode, has_backup, has_personal_data, activate_demo, deactivate_demo, reset_all_data
+from constants import DEMO_USER_NAME
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
@@ -273,7 +274,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     st.space()
     st.subheader("Mode démo", anchor=False)
 
-    st.markdown(":material/person: **Thomas Mercier** - profil diversifié ~200 000 €")
+    st.markdown(f":material/person: **{DEMO_USER_NAME}** - profil diversifié ~200 000 €")
     st.caption("Livrets · PEA · CTO · Crypto · Assurance vie · SCPI")
 
     demo_actif = is_demo_mode()
@@ -283,6 +284,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     if nouveau_state != demo_actif:
         if nouveau_state:
             msg = activate_demo()
+            st.session_state.pop("prices_refreshed", None)
         else:
             msg = deactivate_demo()
         flash_fn(msg, "success")
