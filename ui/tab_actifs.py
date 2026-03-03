@@ -98,10 +98,8 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             key="btn_dl_assets",
             help="La liste de tes actifs : nom, catégorie, montant, ticker…",
         )
-
     with col2:
         #st.markdown("**Historique des montants**")
-
         st.download_button(
             "Historique des montants",
             data=download_historique(),
@@ -112,7 +110,6 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             key="btn_dl_historique",
             help="L'évolution des montants dans le temps pour tes actifs manuels (livrets, immo…)",
         )
-
     with col3:
         #st.markdown("**Historique des positions**")
         st.download_button(
@@ -125,11 +122,9 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             key="btn_dl_positions",
             help="L'évolution des quantités dans le temps pour tes actions et cryptos",
         )
-
     # ── Import ────────────────────────────────────────────────────────────────
     st.space()
     st.markdown("**Imports** - :orange[:material/warning: Remplace toutes les données existantes. Action irréversible !]")
-
     col1, col2, col3 = st.columns(3)
     with col1:
         f = st.file_uploader("Importer mes actifs", type="csv",
@@ -141,7 +136,6 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             if ok:
                 invalidate_cache_fn()
             st.rerun()
-
     with col2:
         f = st.file_uploader("Importer mon historique", type="csv",
                              key=f"up_historique_{st.session_state.get('_up_historique_v', 0)}")
@@ -152,7 +146,6 @@ def _render_backup_section(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             if ok:
                 invalidate_cache_fn()
             st.rerun()
-
     with col3:
         f = st.file_uploader("Importer mes positions", type="csv",
                              key=f"up_positions_{st.session_state.get('_up_positions_v', 0)}")
@@ -201,40 +194,61 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     st.space(size="small")
 
     # Affichage des boutons d'action
-    with st.container(horizontal=True, vertical_alignment="center"):
+    if not df.empty:
         with st.container(horizontal=True, vertical_alignment="center"):
-            if st.button(
-                    "",
-                    icon=":material/refresh:",
-                    disabled=not has_auto_assets,
-                    help="Actualiser les prix",
-                    key="btn_refresh_prices",
-                    type="tertiary"
-                ):
-                    with st.spinner("Récupération des prix…"):
-                        df, msg, msg_type = refresh_prices(df)
-                    flash_fn(msg, msg_type)
-                    st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
-                    st.session_state["sync_error_tickers"] = set(
-                        msg.replace("Tickers introuvables : ", "").split(", ")
-                    ) if msg_type == "warning" else set()
-                    invalidate_cache_fn()
-                    st.rerun()
-            if has_auto_assets and "sync_time" in st.session_state:
-                st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
+            with st.container(horizontal=True, vertical_alignment="center"):
+                if st.button(
+                        "",
+                        icon=":material/refresh:",
+                        disabled=not has_auto_assets,
+                        help="Actualiser les prix",
+                        key="btn_refresh_prices",
+                        type="tertiary"
+                    ):
+                        with st.spinner("Récupération des prix…"):
+                            df, msg, msg_type = refresh_prices(df)
+                        flash_fn(msg, msg_type)
+                        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+                        st.session_state["sync_error_tickers"] = set(
+                            msg.replace("Tickers introuvables : ", "").split(", ")
+                        ) if msg_type == "warning" else set()
+                        invalidate_cache_fn()
+                        st.rerun()
+                if has_auto_assets and "sync_time" in st.session_state:
+                    st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
 
-        if st.button(
-            "Compléter mon patrimoine",
-            icon=":material/add:",
-            type="primary",
-            key="btn_add_asset",
-        ):
-            set_dialog_create()
-            st.rerun()
+            if st.button(
+                "Compléter mon patrimoine",
+                icon=":material/add:",
+                type="primary",
+                key="btn_add_asset",
+            ):
+                set_dialog_create()
+                st.rerun()
 
     # ── Liste des actifs ──────────────────────────────────────────────────────
     if df.empty:
-        st.info("Aucun actif enregistré. Utilisez le bouton ＋ pour commencer.")
+        with st.container(border=True):
+            st.markdown("### Bienvenue sur ton suivi de patrimoine 👋")
+            st.markdown(" ")
+            st.markdown("**1. Ajoute tes actifs**")
+            st.caption("Livrets, immobilier, actions, crypto, fonds euros — tous tes placements au même endroit.")
+            st.markdown("**2. Les prix se mettent à jour automatiquement**")
+            st.caption("Pour tes actions et cryptos, l'app récupère les cours en temps réel via Yahoo Finance.")
+            st.markdown("**3. Suis l'évolution de ton patrimoine**")
+            st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
+            if st.button("+ Ajouter mon premier actif", type="primary", use_container_width=True, key="btn_empty_state"):
+                set_dialog_create()
+                st.rerun()
+            st.divider()
+            st.markdown("🎮 **Pas encore prêt à saisir tes données ?**")
+            st.caption("Active le mode démo en bas de page pour explorer l'app avec des données fictives sur un an !")
+            st.markdown(" ")
+
+
+
+
+
     else:
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
 
@@ -251,17 +265,20 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                     _render_asset_row(row)
             st.space(size="small")
 
-    # ── Sauvegarde ────────────────────────────────────────────────────────────
-    _render_backup_section(df, invalidate_cache_fn, flash_fn)
+    # ── Gestion des données ────────────────────────────────────────────────────────────
+    if not df.empty:
+        _render_backup_section(df, invalidate_cache_fn, flash_fn)
 
     # ── Données fictives ──────────────────────────────────────────────────
     st.space()
-    st.subheader("Données fictives", anchor=False)
+    st.subheader("Mode démo", anchor=False)
 
-    st.caption("👤 **Thomas Mercier** — profil diversifié ~200 000 €  \nLivrets · PEA · CTO · Crypto · Assurance vie · SCPI")
+    st.markdown(":material/person: **Thomas Mercier** - profil diversifié ~200 000 €")
+    st.caption("Livrets · PEA · CTO · Crypto · Assurance vie · SCPI")
 
     demo_actif = is_demo_mode()
-    nouveau_state = st.toggle("Activer les données fictives", value=demo_actif, key="toggle_demo")
+    help_demo = "Active une simulation avec des données fictives sur un an, pour explorer l'app et ses fonctionnalités sans saisir tes propres données. Idéal pour tester les graphiques de répartition et d'évolution dans le temps !"
+    nouveau_state = st.toggle("Activer les données fictives", value=demo_actif, key="toggle_demo",help=help_demo)
 
     if nouveau_state != demo_actif:
         if nouveau_state:
@@ -274,26 +291,28 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.rerun()
 
     # ── Réinitialisation ──────────────────────────────────────────────────
-    st.space()
-    st.subheader("Réinitialisation", anchor=False)
-    st.warning("⚠️ Supprime définitivement toutes les données (actifs, historique, positions).")
+    
+    if not df.empty and not is_demo_mode():
+        st.space()
+        st.subheader("Réinitialisation", anchor=False)
+        st.warning("⚠️ Supprime définitivement toutes les données (actifs, historique, positions).")
 
-    confirm_input = st.text_input(
-        "Tapez **SUPPRIMER** pour confirmer",
-        placeholder="SUPPRIMER",
-        key="reset_confirm_input",
-    )
-    if st.button(
-        "Tout supprimer",
-        icon=":material/delete_forever:",
-        type="primary",
-        disabled=(confirm_input != "SUPPRIMER"),
-        key="btn_reset_all",
-    ):
-        msg = reset_all_data()
-        flash_fn(msg, "success")
-        st.cache_data.clear()
-        invalidate_cache_fn()
-        st.rerun()
+        confirm_input = st.text_input(
+            "Tapez **SUPPRIMER** pour confirmer",
+            placeholder="SUPPRIMER",
+            key="reset_confirm_input",
+        )
+        if st.button(
+            "Tout supprimer",
+            icon=":material/delete_forever:",
+            type="primary",
+            disabled=(confirm_input != "SUPPRIMER"),
+            key="btn_reset_all",
+        ):
+            msg = reset_all_data()
+            flash_fn(msg, "success")
+            st.cache_data.clear()
+            invalidate_cache_fn()
+            st.rerun()
 
-    return df
+        return df

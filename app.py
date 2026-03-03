@@ -19,8 +19,6 @@ from services.demo_mode import is_demo_mode
 
 st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:")
 
-demo_suffix = "  🎭 *Démo*" if is_demo_mode() else ""
-st.write(f"Bienvenue sur votre suivi de patrimoine{demo_suffix} !")
 
 init_storage()
 init_historique()
@@ -77,7 +75,13 @@ show_flash()
 
 st.logo(image=":material/finance_mode:", size="large", icon_image=":material/finance_mode:")
 
-st.title("Suivi de patrimoine", anchor=False)
+
+st.title(f"Suivi de patrimoine", anchor=False)
+
+if is_demo_mode():
+    st.info("Mode démo",icon="👀")
+
+
 
 tab_actifs, tab_repartition, tab_historique = st.tabs(["📋 Actifs", "📊 Répartition", "📈 Historique"])
 
