@@ -13,7 +13,8 @@ from services.storage import (
     import_assets, import_historique, import_positions,
 )
 from services.demo_mode import (
-    is_demo_mode, activate_demo, deactivate_demo, reset_all_data,
+    is_demo_mode, has_personal_data,
+    activate_demo, deactivate_demo, reset_all_data,
     DEMO_USER_NAME,
 )
 
@@ -44,88 +45,87 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
             invalidate_cache_fn()
             st.rerun()
 
-        st.divider()
+        # ── Export & Import (visibles uniquement si des données existent) ─────
+        if not df.empty:
+            st.divider()
 
-        # ── Export ────────────────────────────────────────────────────────────
-        st.subheader("Télécharger mes données", anchor=False)
+            st.subheader("Télécharger mes données", anchor=False)
+            st.download_button(
+                "Liste des actifs",
+                data=download_assets(df),
+                file_name="sauvegarde_actifs.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True,
+                key="btn_dl_assets",
+                help="Nom, catégorie, montant, ticker… de tous tes actifs.",
+            )
+            st.download_button(
+                "Historique des montants",
+                data=download_historique(),
+                file_name="sauvegarde_historique.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True,
+                key="btn_dl_historique",
+                help="Évolution des montants dans le temps (actifs manuels).",
+            )
+            st.download_button(
+                "Historique des positions",
+                data=download_positions(),
+                file_name="sauvegarde_positions.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True,
+                key="btn_dl_positions",
+                help="Évolution des quantités dans le temps (actions, cryptos).",
+            )
 
-        st.download_button(
-            "Liste des actifs",
-            data=download_assets(df),
-            file_name="sauvegarde_actifs.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True,
-            key="btn_dl_assets",
-            help="Nom, catégorie, montant, ticker… de tous tes actifs.",
-        )
-        st.download_button(
-            "Historique des montants",
-            data=download_historique(),
-            file_name="sauvegarde_historique.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True,
-            key="btn_dl_historique",
-            help="Évolution des montants dans le temps (actifs manuels).",
-        )
-        st.download_button(
-            "Historique des positions",
-            data=download_positions(),
-            file_name="sauvegarde_positions.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True,
-            key="btn_dl_positions",
-            help="Évolution des quantités dans le temps (actions, cryptos).",
-        )
+            st.divider()
 
-        st.divider()
+            st.subheader("Importer des données", anchor=False)
+            st.caption(":orange[:material/warning: Remplace toutes les données existantes.]")
 
-        # ── Import ────────────────────────────────────────────────────────────
-        st.subheader("Importer des données", anchor=False)
-        st.caption(":orange[:material/warning: Remplace toutes les données existantes.]")
+            f = st.file_uploader(
+                "Actifs (.csv)",
+                type="csv",
+                key=f"up_assets_{st.session_state.get('_up_assets_v', 0)}",
+            )
+            if f:
+                ok, msg = import_assets(f)
+                flash_fn(msg, "success" if ok else "error")
+                st.session_state["_up_assets_v"] = st.session_state.get("_up_assets_v", 0) + 1
+                if ok:
+                    invalidate_cache_fn()
+                st.rerun()
 
-        f = st.file_uploader(
-            "Actifs (.csv)",
-            type="csv",
-            key=f"up_assets_{st.session_state.get('_up_assets_v', 0)}",
-        )
-        if f:
-            ok, msg = import_assets(f)
-            flash_fn(msg, "success" if ok else "error")
-            st.session_state["_up_assets_v"] = st.session_state.get("_up_assets_v", 0) + 1
-            if ok:
-                invalidate_cache_fn()
-            st.rerun()
+            f = st.file_uploader(
+                "Historique des montants (.csv)",
+                type="csv",
+                key=f"up_historique_{st.session_state.get('_up_historique_v', 0)}",
+            )
+            if f:
+                ok, msg = import_historique(f)
+                flash_fn(msg, "success" if ok else "error")
+                st.session_state["_up_historique_v"] = st.session_state.get("_up_historique_v", 0) + 1
+                if ok:
+                    invalidate_cache_fn()
+                st.rerun()
 
-        f = st.file_uploader(
-            "Historique des montants (.csv)",
-            type="csv",
-            key=f"up_historique_{st.session_state.get('_up_historique_v', 0)}",
-        )
-        if f:
-            ok, msg = import_historique(f)
-            flash_fn(msg, "success" if ok else "error")
-            st.session_state["_up_historique_v"] = st.session_state.get("_up_historique_v", 0) + 1
-            if ok:
-                invalidate_cache_fn()
-            st.rerun()
+            f = st.file_uploader(
+                "Historique des positions (.csv)",
+                type="csv",
+                key=f"up_positions_{st.session_state.get('_up_positions_v', 0)}",
+            )
+            if f:
+                ok, msg = import_positions(f)
+                flash_fn(msg, "success" if ok else "error")
+                st.session_state["_up_positions_v"] = st.session_state.get("_up_positions_v", 0) + 1
+                if ok:
+                    invalidate_cache_fn()
+                st.rerun()
 
-        f = st.file_uploader(
-            "Historique des positions (.csv)",
-            type="csv",
-            key=f"up_positions_{st.session_state.get('_up_positions_v', 0)}",
-        )
-        if f:
-            ok, msg = import_positions(f)
-            flash_fn(msg, "success" if ok else "error")
-            st.session_state["_up_positions_v"] = st.session_state.get("_up_positions_v", 0) + 1
-            if ok:
-                invalidate_cache_fn()
-            st.rerun()
-
-        # ── Réinitialisation ──────────────────────────────────────────────────
+        # ── Réinitialisation (visible uniquement si données perso) ────────────
         if not df.empty and not is_demo_mode():
             st.divider()
             st.subheader("Réinitialisation", anchor=False)
