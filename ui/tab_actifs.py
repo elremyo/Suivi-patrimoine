@@ -13,6 +13,8 @@ from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
+from services.demo_mode import is_demo_mode, activate_demo, deactivate_demo
+from constants import DEMO_USER_NAME
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
@@ -154,9 +156,9 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
                 set_dialog_create()
                 st.rerun()
             st.divider()
-            st.markdown("🎮 **Pas encore prêt à saisir tes données ?**")
-            st.caption("Active le mode démo dans la barre latérale pour explorer l'app avec des données fictives !")
-            st.markdown(" ")
+            st.markdown("**Pas encore prêt à saisir tes données ?**")
+            st.markdown("Explore l'app avec un profil fictif diversifié ~200 000 € sur un an !")
+            st.markdown(f"👀 Active la démo depuis le menu de gauche")
 
     else:
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
