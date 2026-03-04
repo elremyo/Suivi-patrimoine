@@ -11,7 +11,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from services.asset_manager import refresh_prices
-from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete
+from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete, set_dialog_update
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
 from services.demo_mode import is_demo_mode, activate_demo, deactivate_demo
 from constants import DEMO_USER_NAME
@@ -21,7 +21,7 @@ from constants import DEMO_USER_NAME
 
 def _render_asset_row(row: pd.Series):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 2, 1, 1])
+    cols = st.columns([4, 2, 2, 2, 1, 1, 1])
 
     # ── Colonne nom + infos discrètes ─────────────────────────────────────────
     courtier  = str(row.get("courtier",  "") or "").strip()
@@ -63,12 +63,22 @@ def _render_asset_row(row: pd.Series):
         sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
         cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
-    # ── Boutons ───────────────────────────────────────────────────────────────
-    if cols[4].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
+    # ── Bouton mise à jour datée ──────────────────────────────────────────────
+    if cols[4].button(
+        "",
+        key=f"upd_{row['id']}",
+        icon=":material/history:",
+        help="Mettre à jour à une date",
+    ):
+        set_dialog_update(row["id"])
+        st.rerun()
+
+    # ── Boutons édition / suppression ─────────────────────────────────────────
+    if cols[5].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
         set_dialog_edit(row["id"])
         st.rerun()
 
-    if cols[5].button("", key=f"del_{row['id']}", icon=":material/delete:"):
+    if cols[6].button("", key=f"del_{row['id']}", icon=":material/delete:"):
         set_dialog_delete(row["id"])
         st.rerun()
 

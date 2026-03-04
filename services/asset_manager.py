@@ -31,15 +31,6 @@ def create_auto_asset(
     courtier: str = "",
     enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
-    """
-    Crée un actif automatique (Actions & Fonds, Crypto) :
-    1. Valide le format du ticker
-    2. Récupère le nom depuis yfinance
-    3. Ajoute l'actif au DataFrame
-    4. Enregistre la position initiale
-    5. Rafraîchit le prix
-    6. Sauvegarde sur le disque
-    """
     valid, err = validate_ticker(ticker)
     if not valid:
         return df, err, "error"
@@ -65,12 +56,6 @@ def create_manual_asset(
     courtier: str = "",
     enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
-    """
-    Crée un actif manuel (Livrets, Immobilier, Fonds euros) :
-    1. Ajoute l'actif au DataFrame
-    2. Enregistre le montant dans l'historique
-    3. Sauvegarde sur le disque
-    """
     df = add_asset(df, nom, categorie, montant, courtier=courtier, enveloppe=enveloppe)
     asset_id = df.iloc[-1]["id"]
     record_montant(asset_id, montant)
@@ -94,15 +79,6 @@ def edit_auto_asset(
     courtier: str = "",
     enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
-    """
-    Modifie un actif automatique :
-    1. Valide le format du ticker
-    2. Récupère le nouveau nom si le ticker a changé
-    3. Met à jour l'actif
-    4. Enregistre une nouvelle position si la quantité a changé
-    5. Rafraîchit le prix
-    6. Sauvegarde sur le disque
-    """
     valid, err = validate_ticker(ticker)
     if not valid:
         return df, err, "error"
@@ -132,19 +108,13 @@ def edit_manual_asset(
     courtier: str = "",
     enveloppe: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
-    """
-    Modifie un actif manuel :
-    1. Met à jour l'actif
-    2. Enregistre le nouveau montant dans l'historique
-    3. Sauvegarde sur le disque
-    """
     montant_actuel = float(df.loc[idx, "montant"])
 
     df = update_asset(df, idx, nom, categorie, montant,
                       courtier=courtier, enveloppe=enveloppe)
     if montant != montant_actuel:
         record_montant(asset_id, montant)
-        
+
     save_assets(df)
 
     return df, "Actif modifié", "success"
@@ -157,13 +127,6 @@ def remove_asset(
     idx: int,
     asset_id: str,
 ) -> tuple[pd.DataFrame, str, str]:
-    """
-    Supprime un actif et toutes ses données associées :
-    1. Supprime l'historique des montants
-    2. Supprime l'historique des positions
-    3. Supprime l'actif du DataFrame
-    4. Sauvegarde sur le disque
-    """
     delete_asset_history(asset_id)
     delete_asset_positions(asset_id)
     df = delete_asset(df, idx)
@@ -175,15 +138,60 @@ def remove_asset(
 # ── Rafraîchissement des prix ─────────────────────────────────────────────────
 
 def refresh_prices(df: pd.DataFrame) -> tuple[pd.DataFrame, str, str]:
-    """
-    Rafraîchit les prix de tous les actifs automatiques :
-    1. Récupère les derniers prix depuis yfinance
-    2. Met à jour les montants
-    3. Sauvegarde sur le disque
-    """
     df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
     save_assets(df)
 
     if errors:
         return df, f"Tickers introuvables : {', '.join(errors)}", "warning"
     return df, "Prix mis à jour", "success"
+
+
+# ── Mise à jour datée ─────────────────────────────────────────────────────────
+
+def update_at_date(
+    df: pd.DataFrame,
+    asset_id: str,
+    categorie: str,
+    op_date,
+    quantite: float | None = None,
+    pru: float | None = None,
+    montant: float | None = None,
+) -> tuple[pd.DataFrame, str, str]:
+    """
+    Enregistre l'état d'un actif à une date donnée.
+
+    - Actif auto  : quantité totale + PRU à cette date
+    - Actif manuel : montant total à cette date
+
+    Permet de saisir une mise à jour rétroactive (ex : achat effectué
+    le 15 mais saisi le 22 — on choisit le 15 comme date).
+    Retourne (df_mis_à_jour, message, type_message).
+    """
+    idx_list = df.index[df["id"] == asset_id].tolist()
+    if not idx_list:
+        return df, "Actif introuvable.", "error"
+    idx = idx_list[0]
+
+    if categorie in CATEGORIES_AUTO:
+        if quantite is None or pru is None:
+            return df, "Quantité et PRU requis.", "error"
+
+        record_position(asset_id, quantite, op_date)
+        df.loc[idx, "quantite"] = quantite
+        df.loc[idx, "pru"] = pru
+
+        df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
+        save_assets(df)
+
+        if errors:
+            return df, f"Mise à jour enregistrée, mais prix introuvable : {', '.join(errors)}", "warning"
+        return df, "Mise à jour enregistrée", "success"
+
+    else:
+        if montant is None:
+            return df, "Montant requis.", "error"
+
+        record_montant(asset_id, montant, op_date)
+        df.loc[idx, "montant"] = montant
+        save_assets(df)
+        return df, "Mise à jour enregistrée", "success"
