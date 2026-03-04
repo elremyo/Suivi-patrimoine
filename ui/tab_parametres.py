@@ -69,14 +69,14 @@ def _render_liste(
 
         if rename_fn and editing == item:
             # ── Mode édition inline ────────────────────────────────────────
-            c1, c2, c3 = st.columns([5, 1, 1], vertical_alignment="center")
+            c1, c2, c3 = st.columns([6, 1, 1], vertical_alignment="center")
             nouveau_nom = c1.text_input(
                 "Renommer",
                 value=item,
                 label_visibility="collapsed",
                 key=f"rename_input_{add_key}_{item}",
             )
-            if c2.button("", icon=":material/check:", key=f"confirm_rename_{add_key}_{item}", help="Confirmer"):
+            if c2.button("", icon=":material/check:", key=f"confirm_rename_{add_key}_{item}", help="Confirmer", type="primary"):
                 ok, msg, df_assets = rename_fn(item, nouveau_nom, df_assets)
                 st.toast(msg, icon="✅" if ok else "⚠️")
                 st.session_state.pop(editing_key, None)
