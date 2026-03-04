@@ -134,3 +134,37 @@ def delete_enveloppe(valeur: str, df_assets: pd.DataFrame) -> tuple[bool, str]:
     df = df[~((df["type"] == "enveloppe") & (df["valeur"] == valeur))].reset_index(drop=True)
     safe_write_csv(df, REFERENTIEL_PATH)
     return True, f"Enveloppe « {valeur} » supprimée."
+
+
+# ── Renommage ─────────────────────────────────────────────────────────────────
+
+def rename_courtier(ancien: str, nouveau: str, df_assets: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
+    """
+    Renomme un courtier dans le référentiel ET dans tous les actifs concernés.
+    Retourne (succès, message, df_assets_mis_à_jour).
+    """
+    nouveau = nouveau.strip()
+    if not nouveau:
+        return False, "Le nouveau nom ne peut pas être vide.", df_assets
+    if nouveau == ancien:
+        return False, "Le nouveau nom est identique à l'ancien.", df_assets
+
+    df_ref = load_referentiel()
+    existe_deja = ((df_ref["type"] == "courtier") & (df_ref["valeur"] == nouveau)).any()
+    if existe_deja:
+        return False, f"« {nouveau} » existe déjà dans le référentiel.", df_assets
+
+    # Mise à jour du référentiel
+    df_ref.loc[(df_ref["type"] == "courtier") & (df_ref["valeur"] == ancien), "valeur"] = nouveau
+    safe_write_csv(df_ref, REFERENTIEL_PATH)
+
+    # Mise à jour des actifs concernés
+    if not df_assets.empty:
+        mask = df_assets["courtier"].astype(str).str.strip() == ancien
+        df_assets.loc[mask, "courtier"] = nouveau
+        from constants import DATA_PATH
+        safe_write_csv(df_assets, DATA_PATH)
+
+    nb = int(mask.sum()) if not df_assets.empty else 0
+    detail = f" ({nb} actif{'s' if nb > 1 else ''} mis à jour)" if nb > 0 else ""
+    return True, f"Courtier renommé en « {nouveau} »{detail}.", df_assets

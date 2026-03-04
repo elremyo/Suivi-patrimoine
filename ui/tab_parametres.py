@@ -12,6 +12,7 @@ from services.referentiel import (
     get_courtiers, get_enveloppes,
     add_courtier, add_enveloppe,
     delete_courtier, delete_enveloppe,
+    rename_courtier,
 )
 
 
@@ -82,6 +83,76 @@ def _render_liste(
                     st.toast(msg, icon="⚠️")
 
 
+def _render_courtiers(df: pd.DataFrame):
+    """Liste des courtiers avec ajout, renommage inline et suppression."""
+    st.subheader("Courtiers", anchor=False)
+
+    # ── Ajout ──────────────────────────────────────────────────────────────
+    with st.container(horizontal=True, vertical_alignment="bottom"):
+        nouveau = st.text_input(
+            "Courtiers",
+            placeholder="Nouveau courtier…",
+            label_visibility="collapsed",
+            key="input_courtier",
+        )
+        if st.button("Ajouter", key="btn_add_courtier", type="primary"):
+            if nouveau.strip():
+                ok, msg = add_courtier(nouveau.strip())
+                st.toast(msg, icon="✅" if ok else "⚠️")
+                if ok:
+                    st.rerun()
+            else:
+                st.toast("Le champ ne peut pas être vide.", icon="⚠️")
+
+    # ── Liste ──────────────────────────────────────────────────────────────
+    items = get_courtiers()
+    if not items:
+        st.caption("Aucun courtier pour l'instant.")
+        return
+
+    editing = st.session_state.get("_editing_courtier")
+
+    for item in items:
+        is_used = (
+            not df.empty
+            and (df["courtier"].astype(str).str.strip() == item).any()
+        )
+
+        if editing == item:
+            # Mode édition inline
+            c1, c2, c3 = st.columns([5, 1, 1], vertical_alignment="center")
+            nouveau_nom = c1.text_input(
+                "Renommer",
+                value=item,
+                label_visibility="collapsed",
+                key=f"rename_input_{item}",
+            )
+            if c2.button("", icon=":material/check:", key=f"confirm_rename_{item}", help="Confirmer"):
+                ok, msg, df = rename_courtier(item, nouveau_nom, df)
+                st.toast(msg, icon="✅" if ok else "⚠️")
+                st.session_state.pop("_editing_courtier", None)
+                if ok:
+                    st.rerun()
+            if c3.button("", icon=":material/close:", key=f"cancel_rename_{item}", help="Annuler"):
+                st.session_state.pop("_editing_courtier", None)
+                st.rerun()
+        else:
+            # Mode affichage normal
+            c1, c2, c3 = st.columns([6, 1, 1], vertical_alignment="center")
+            c1.write(item)
+            if c2.button("", icon=":material/edit:", key=f"edit_courtier_{item}", help=f"Renommer « {item} »"):
+                st.session_state["_editing_courtier"] = item
+                st.rerun()
+            if is_used:
+                c3.caption(":grey[:material/link:]")
+            else:
+                if c3.button("", icon=":material/delete:", key=f"del_courtier_{item}", help=f"Supprimer « {item} »"):
+                    ok, msg = delete_courtier(item, df)
+                    st.toast(msg, icon="✅" if ok else "⚠️")
+                    if ok:
+                        st.rerun()
+
+
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame):
@@ -92,16 +163,7 @@ def render(df: pd.DataFrame):
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        _render_liste(
-            label="Courtiers",
-            items=get_courtiers(),
-            add_fn=add_courtier,
-            delete_fn=delete_courtier,
-            df_assets=df,
-            add_key="courtier",
-            btn_key_prefix="courtier",
-            placeholder="Nouveau courtier…",
-        )
+        _render_courtiers(df)
 
     with col2:
         _render_liste(
