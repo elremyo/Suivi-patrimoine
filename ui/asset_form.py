@@ -133,8 +133,8 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
 
 def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     initial_ticker    = row.get("ticker", "")    if mode == "edit" else ""
-    initial_quantite  = float(row.get("quantite") or 0.0) if mode == "create" else 0.0
-    initial_pru       = float(row.get("pru")      or 0.0) if mode == "create" else 0.0
+    initial_quantite  = float(row.get("quantite") or 0.0) if mode == "edit" else 0.0
+    initial_pru       = float(row.get("pru")      or 0.0) if mode == "edit" else 0.0
     auto_categories   = [c for c in CATEGORIES_ASSETS if c in CATEGORIES_AUTO]
     initial_categorie = row["categorie"] if mode == "edit" and row["categorie"] in auto_categories else auto_categories[0]
 
