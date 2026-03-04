@@ -56,8 +56,10 @@ def _render_liste(
         st.caption("Aucun élément pour l'instant.")
         return
 
-    editing_key = f"_editing_{add_key}"
-    editing = st.session_state.get(editing_key)
+    editing_key  = f"_editing_{add_key}"
+    deleting_key = f"_deleting_{add_key}"
+    editing  = st.session_state.get(editing_key)
+    deleting = st.session_state.get(deleting_key)
 
     for item in items:
         is_used = (
@@ -86,6 +88,21 @@ def _render_liste(
                 st.session_state.pop(editing_key, None)
                 st.rerun()
 
+        elif deleting == item:
+            # ── Mode confirmation de suppression ───────────────────────────
+            with st.container(border=True):
+                st.warning(f"Supprimer « {item} » ? Cette action est irréversible.", icon=":material/warning:")
+                c1, c2 = st.columns(2)
+                if c1.button("Annuler", use_container_width=True, key=f"cancel_del_{add_key}_{item}"):
+                    st.session_state.pop(deleting_key, None)
+                    st.rerun()
+                if c2.button("Confirmer", type="primary", use_container_width=True, key=f"confirm_del_{add_key}_{item}"):
+                    ok, msg = delete_fn(item, df_assets)
+                    st.toast(msg, icon="✅" if ok else "⚠️")
+                    st.session_state.pop(deleting_key, None)
+                    if ok:
+                        st.rerun()
+
         else:
             # ── Mode affichage normal ──────────────────────────────────────
             nb_cols = [6, 1, 1] if rename_fn else [7, 1]
@@ -101,13 +118,11 @@ def _render_liste(
                 delete_col = cols[1]
 
             if is_used:
-                delete_col.caption(":grey[:material/link:]")
+                delete_col.button("", icon=":material/delete:", disabled=True, key=f"del_{add_key}_{item}", help=f"Impossible — « {item} » est utilisé par un actif.")
             else:
                 if delete_col.button("", icon=":material/delete:", key=f"del_{add_key}_{item}", help=f"Supprimer « {item} »"):
-                    ok, msg = delete_fn(item, df_assets)
-                    st.toast(msg, icon="✅" if ok else "⚠️")
-                    if ok:
-                        st.rerun()
+                    st.session_state[deleting_key] = item
+                    st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
