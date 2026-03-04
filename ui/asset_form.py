@@ -29,7 +29,8 @@ from services.asset_manager import (
     remove_asset, update_at_date,
 )
 from services.pricer import validate_ticker, lookup_ticker
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES
+from services.referentiel import get_courtiers, get_enveloppes, add_courtier, add_enveloppe
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO
 
 
 # ── Gestion de l'état des modales ─────────────────────────────────────────────
@@ -64,21 +65,82 @@ def _find_row_by_id(df: pd.DataFrame, asset_id: str):
 
 
 def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
-    initial_courtier  = row.get("courtier",  "") if row is not None else ""
-    initial_enveloppe = row.get("enveloppe", "") if row is not None else ""
+    """
+    Affiche les champs Courtier et Enveloppe sous forme de listes déroulantes
+    alimentées par le référentiel. Si l'utilisateur choisit "+ Nouveau...",
+    un champ texte apparaît pour saisir une nouvelle valeur.
+    La nouvelle valeur est enregistrée dans le référentiel à la sauvegarde.
+    """
+    initial_courtier  = str(row.get("courtier",  "") or "").strip() if row is not None else ""
+    initial_enveloppe = str(row.get("enveloppe", "") or "").strip() if row is not None else ""
 
-    courtier = st.text_input("Courtier / Banque *", value=initial_courtier,
-                              placeholder="ex. Boursorama, Binance, Crédit Agricole",
-                              key="_form_courtier")
+    NOUVEAU_COURTIER  = "+ Nouveau courtier"
+    NOUVELLE_ENVELOPPE = "+ Nouvelle enveloppe"
 
-    if show_enveloppe:
-        enveloppe_index = ENVELOPPES.index(initial_enveloppe) if initial_enveloppe in ENVELOPPES else 0
-        enveloppe = st.selectbox("Enveloppe *", options=ENVELOPPES,
-                                 index=enveloppe_index, key="_form_enveloppe")
+    # ── Courtier ──────────────────────────────────────────────────────────────
+    courtiers = get_courtiers()
+
+    # Si la valeur actuelle n'est pas encore dans le référentiel, on l'affiche quand même
+    courtier_options = courtiers[:]
+    if initial_courtier and initial_courtier not in courtier_options:
+        courtier_options.insert(0, initial_courtier)
+    courtier_options.append(NOUVEAU_COURTIER)
+
+    default_idx = courtier_options.index(initial_courtier) if initial_courtier in courtier_options else 0
+
+    courtier_selection = st.selectbox(
+        "Courtier / Banque *",
+        options=courtier_options,
+        index=default_idx,
+        key="_form_courtier_select",
+    )
+
+    if courtier_selection == NOUVEAU_COURTIER:
+        courtier = st.text_input(
+            "Nom du nouveau courtier",
+            placeholder="ex. Boursorama, Binance, Crédit Agricole",
+            key="_form_courtier_new",
+        ).strip()
     else:
-        enveloppe = ""
+        courtier = courtier_selection
+
+    # ── Enveloppe ─────────────────────────────────────────────────────────────
+    enveloppe = ""
+    if show_enveloppe:
+        enveloppes = get_enveloppes()
+
+        enveloppe_options = enveloppes[:]
+        if initial_enveloppe and initial_enveloppe not in enveloppe_options:
+            enveloppe_options.insert(0, initial_enveloppe)
+        enveloppe_options.append(NOUVELLE_ENVELOPPE)
+
+        default_idx_env = enveloppe_options.index(initial_enveloppe) if initial_enveloppe in enveloppe_options else 0
+
+        enveloppe_selection = st.selectbox(
+            "Enveloppe *",
+            options=enveloppe_options,
+            index=default_idx_env,
+            key="_form_enveloppe_select",
+        )
+
+        if enveloppe_selection == NOUVELLE_ENVELOPPE:
+            enveloppe = st.text_input(
+                "Nom de la nouvelle enveloppe",
+                placeholder="ex. PEA-PME, Épargne salariale",
+                key="_form_enveloppe_new",
+            ).strip()
+        else:
+            enveloppe = enveloppe_selection
 
     return courtier, enveloppe
+
+
+def _save_referentiel(courtier: str, enveloppe: str):
+    """Enregistre courtier et enveloppe dans le référentiel si ce sont de nouvelles valeurs."""
+    if courtier:
+        add_courtier(courtier)   # idempotent : ignore si déjà présent
+    if enveloppe:
+        add_enveloppe(enveloppe) # idempotent : ignore si déjà présent
 
 
 # ── Ticker picker ─────────────────────────────────────────────────────────────
@@ -145,7 +207,6 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         _cancel_button()
         return df
 
-    # Quantité et PRU uniquement à la création — ensuite via "Mettre à jour"
     if mode == "create":
         quantite = st.number_input("Quantité", min_value=0.0, value=initial_quantite, step=1.0, format="%g", key="_form_quantite")
         pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire/Prix d'achat (hors frais).")
@@ -172,6 +233,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         if not courtier:
             st.warning("Le courtier / la banque est obligatoire.")
         else:
+            _save_referentiel(courtier, enveloppe)
             effective_ticker = ticker_result["ticker"]
             if mode == "create":
                 with st.spinner("Ajout en cours…"):
@@ -231,6 +293,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         elif not courtier:
             st.warning("Le courtier / la banque est obligatoire.")
         else:
+            _save_referentiel(courtier, enveloppe)
             if mode == "create":
                 df, msg, msg_type = create_manual_asset(
                     df, nom, categorie, montant,
@@ -273,7 +336,6 @@ def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
     is_auto = row["categorie"] in CATEGORIES_AUTO
     ticker = row.get("ticker", "")
 
-    # En-tête discret
     st.caption(
         f"{row['nom']}" + (f" · {ticker}" if ticker else "")
     )
