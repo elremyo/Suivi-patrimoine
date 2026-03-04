@@ -105,4 +105,4 @@ with tab_historique:
     render_historique(df, df_hist, df_positions)
 
 with tab_params:
-    render_parametres(df)
+    render_parametres(df, invalidate_data_cache)
