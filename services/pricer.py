@@ -17,7 +17,7 @@ def validate_ticker(ticker: str) -> tuple[bool, str]:
     if not ticker:
         return False, "Le ticker ne peut pas être vide."
     if not _TICKER_PATTERN.match(ticker):
-        return False, f"Ticker invalide : « {ticker} ». Utilisez uniquement des lettres, chiffres, tirets ou points (ex. AAPL, BTC-USD, CW8.PA)."
+        return False, f"Ticker invalide : « {ticker} ». Utilise uniquement des lettres, chiffres, tirets ou points (ex. AAPL, BTC-USD, CW8.PA)."
     return True, ""
 
 

@@ -33,7 +33,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     has_history = not df_hist.empty or (not df_positions.empty and bool(auto_tickers))
 
     if not has_history:
-        st.info("Aucun historique disponible. Ajoutez des actifs et mettez à jour leurs montants pour construire un historique.")
+        st.info("Aucun historique disponible. Ajoute des actifs et mets à jour leurs montants pour construire un historique.")
         return
 
     # Sélecteur de période format radio

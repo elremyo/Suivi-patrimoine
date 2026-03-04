@@ -131,7 +131,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
                 st.warning("Supprime définitivement toutes vos données. Irréversible !", icon=":material/warning:")
 
                 confirm_input = st.text_input(
-                    "Tapez **SUPPRIMER** pour confirmer",
+                    "Tape **SUPPRIMER** pour confirmer",
                     placeholder="SUPPRIMER",
                     key="reset_confirm_input",
                 )

@@ -69,7 +69,7 @@ def _render_enveloppe_metrics(df: pd.DataFrame):
 
 def render(df: pd.DataFrame):
     if df.empty:
-        st.info("Aucun actif enregistré. Ajoutez des actifs pour voir la répartition.")
+        st.info("Aucun actif enregistré. Ajoute des actifs pour voir la répartition.")
         return
 
     _render_pie_chart(df)

@@ -141,7 +141,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     ticker_result = _ticker_picker(initial_ticker=initial_ticker)
 
     if ticker_result is None:
-        st.info("Vérifiez le ticker pour continuer.")
+        st.info("Vérifie le ticker pour continuer.")
         _cancel_button()
         return df
 
