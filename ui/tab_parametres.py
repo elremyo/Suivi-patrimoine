@@ -23,6 +23,7 @@ def _render_liste(
     df_assets: pd.DataFrame,
     add_key: str,
     btn_key_prefix: str,
+    placeholder: str,
 ):
     """Composant générique : affiche une liste avec ajout et suppression."""
 
@@ -31,8 +32,8 @@ def _render_liste(
     # ── Ajout ──────────────────────────────────────────────────────────────
     with st.container(horizontal=True, vertical_alignment="bottom"):
         nouveau = st.text_input(
-            f"Ajouter un {label.lower()[:-1]}",  # "courtier" ou "enveloppe"
-            placeholder=f"Nouveau {label.lower()[:-1]}…",
+            label,
+            placeholder=placeholder,
             label_visibility="collapsed",
             key=f"input_{add_key}",
         )
@@ -99,6 +100,7 @@ def render(df: pd.DataFrame):
             df_assets=df,
             add_key="courtier",
             btn_key_prefix="courtier",
+            placeholder="Nouveau courtier…",
         )
 
     with col2:
@@ -110,4 +112,5 @@ def render(df: pd.DataFrame):
             df_assets=df,
             add_key="enveloppe",
             btn_key_prefix="enveloppe",
+            placeholder="Nouvelle enveloppe…",
         )
