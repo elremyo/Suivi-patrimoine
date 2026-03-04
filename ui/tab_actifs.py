@@ -21,7 +21,7 @@ from constants import DEMO_USER_NAME
 
 def _render_asset_row(row: pd.Series):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 2, 1, 1, 1])
+    cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5])
 
     # ── Colonne nom + infos discrètes ─────────────────────────────────────────
     courtier  = str(row.get("courtier",  "") or "").strip()
@@ -74,11 +74,11 @@ def _render_asset_row(row: pd.Series):
         st.rerun()
 
     # ── Boutons édition / suppression ─────────────────────────────────────────
-    if cols[5].button("", key=f"mod_{row['id']}", icon=":material/edit_square:"):
+    if cols[5].button("", key=f"mod_{row['id']}", icon=":material/edit_square:",help="Modifier l'actif"):
         set_dialog_edit(row["id"])
         st.rerun()
 
-    if cols[6].button("", key=f"del_{row['id']}", icon=":material/delete:"):
+    if cols[6].button("", key=f"del_{row['id']}", icon=":material/delete:",help="Supprimer l'actif"):
         set_dialog_delete(row["id"])
         st.rerun()
 
