@@ -20,7 +20,7 @@ from ui.sidebar import render as render_sidebar
 from services.demo_mode import is_demo_mode
 
 
-st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:")
+st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:", initial_sidebar_state="collapsed")
 
 
 init_storage()
