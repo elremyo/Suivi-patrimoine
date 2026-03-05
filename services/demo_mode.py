@@ -16,7 +16,7 @@ BACKUP_DIR = os.path.join(DATA_DIR, "data_backup")
 DEMO_DIR   = os.path.join(DATA_DIR, "donnees_fictives")
 MODE_FILE  = os.path.join(DATA_DIR, ".mode")
 
-FICHIERS = ["patrimoine.csv", "historique.csv", "positions.csv"]
+FICHIERS = ["patrimoine.csv", "historique.csv", "positions.csv","referentiel.csv"]
 
 
 def is_demo_mode() -> bool:
