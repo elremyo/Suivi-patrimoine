@@ -75,7 +75,6 @@ def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
     initial_enveloppe = str(row.get("enveloppe", "") or "").strip() if row is not None else ""
 
     NOUVEAU_COURTIER  = "+ Nouveau courtier"
-    NOUVELLE_ENVELOPPE = "+ Nouvelle enveloppe"
 
     # ── Courtier ──────────────────────────────────────────────────────────────
     courtiers = get_courtiers()
@@ -107,30 +106,14 @@ def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
     # ── Enveloppe ─────────────────────────────────────────────────────────────
     enveloppe = ""
     if show_enveloppe:
-        enveloppes = sorted(ENVELOPPES)
-
-        enveloppe_options = enveloppes[:]
-        if initial_enveloppe and initial_enveloppe not in enveloppe_options:
-            enveloppe_options.insert(0, initial_enveloppe)
-        enveloppe_options.append(NOUVELLE_ENVELOPPE)
-
+        enveloppe_options = sorted(ENVELOPPES)
         default_idx_env = enveloppe_options.index(initial_enveloppe) if initial_enveloppe in enveloppe_options else 0
-
-        enveloppe_selection = st.selectbox(
+        enveloppe = st.selectbox(
             "Enveloppe *",
             options=enveloppe_options,
             index=default_idx_env,
             key="_form_enveloppe_select",
         )
-
-        if enveloppe_selection == NOUVELLE_ENVELOPPE:
-            enveloppe = st.text_input(
-                "Nom de la nouvelle enveloppe",
-                placeholder="ex. PEA-PME, Épargne salariale",
-                key="_form_enveloppe_new",
-            ).strip()
-        else:
-            enveloppe = enveloppe_selection
 
     return courtier, enveloppe
 
