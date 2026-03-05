@@ -190,7 +190,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
 
     if mode == "create":
         quantite = st.number_input("Quantité", min_value=0.0, value=initial_quantite, step=1.0, format="%g", key="_form_quantite")
-        pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire/Prix d'achat (hors frais).")
+        pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire, Prix d'achat (hors frais).")
     else:
         quantite = float(row.get("quantite") or 0.0)
         pru      = float(row.get("pru")      or 0.0)
@@ -299,7 +299,7 @@ def _cancel_button():
 
 # ── Modale mise à jour datée ──────────────────────────────────────────────────
 
-@st.dialog("Mettre à jour", dismissible=False)
+@st.dialog("Mettre à jour un montant", dismissible=False)
 def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
     from datetime import date
 
@@ -320,7 +320,7 @@ def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
     )
 
     op_date = st.date_input(
-        "Date",
+        "Date de l'opération",
         value=date.today(),
         key="_upd_date",
         help="Date réelle de l'opération, si différente d'aujourd'hui.",
@@ -331,7 +331,7 @@ def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
         pru_actuel = float(row.get("pru") or 0.0)
 
         quantite = st.number_input(
-            "Quantité totale détenue",
+            "Nouvelle quantité totale détenue",
             min_value=0.0,
             value=quantite_actuelle,
             step=1.0,
@@ -339,13 +339,13 @@ def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
             key="_upd_quantite",
         )
         pru = st.number_input(
-            "PRU (€)",
+            "Nouveau PRU (€)",
             min_value=0.0,
             value=pru_actuel,
             step=1.0,
             format="%g",
             key="_upd_pru",
-            help="Prix de Revient Unitaire mis à jour.",
+            help="Prix de Revient Unitaire",
         )
 
     else:
@@ -386,7 +386,7 @@ def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
 
 # ── Modales Streamlit (création / édition / suppression) ─────────────────────
 
-@st.dialog("Actif", dismissible=False)
+@st.dialog("Ajouter un actif", dismissible=False,width="large")
 def _dialog_create(df, invalidate_cache_fn, flash_fn):
     st.markdown("### Ajouter un actif")
     is_auto = st.toggle("Actif financier (ticker)", value=True, key="_form_is_auto")
@@ -396,7 +396,7 @@ def _dialog_create(df, invalidate_cache_fn, flash_fn):
         _form_manual(df, "create", None, None, invalidate_cache_fn, flash_fn)
 
 
-@st.dialog("Actif", dismissible=False)
+@st.dialog("Editer un actif", dismissible=False)
 def _dialog_edit(df, asset_id, invalidate_cache_fn, flash_fn):
     try:
         idx, row = _find_row_by_id(df, asset_id)
