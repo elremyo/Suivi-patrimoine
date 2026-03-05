@@ -94,7 +94,7 @@ def _render_liste(
             elif deleting == item:
                 # ── Mode confirmation de suppression ───────────────────────────
                 with st.container(border=True):
-                    st.warning(f"Supprimer « {item} » ? Cette action est irréversible.", icon=":material/warning:")
+                    st.warning(f"Supprimer **{item}** ? Cette action est irréversible.", icon=":material/warning:")
                     c1, c2 = st.columns(2)
                     if c1.button("Annuler", use_container_width=True, key=f"cancel_del_{add_key}_{item}"):
                         st.session_state.pop(deleting_key, None)
@@ -121,9 +121,9 @@ def _render_liste(
                     delete_col = cols[1]
 
                 if is_used:
-                    delete_col.button("", icon=":material/delete:", disabled=True, key=f"del_{add_key}_{item}", help=f"Impossible — « {item} » est utilisé par un actif.")
+                    delete_col.button("", icon=":material/delete:", disabled=True, key=f"del_{add_key}_{item}", help=f"Impossible : **{item}** est utilisé par un actif.")
                 else:
-                    if delete_col.button("", icon=":material/delete:", key=f"del_{add_key}_{item}", help=f"Supprimer « {item} »"):
+                    if delete_col.button("", icon=":material/delete:", key=f"del_{add_key}_{item}", help=f"Supprimer **{item}**"):
                         st.session_state[deleting_key] = item
                         st.rerun()
 
@@ -131,11 +131,10 @@ def _render_liste(
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame, invalidate_cache_fn=None):
-    st.subheader("Référentiel", anchor=False)
-    st.caption("Gérez les courtiers et enveloppes proposés lors de la saisie d'un actif.")
+    st.subheader("Mes courtiers", anchor=False)
 
     _render_liste(
-        label="Courtiers",
+        label="",
         items=get_courtiers(),
         add_fn=add_courtier,
         delete_fn=delete_courtier,

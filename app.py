@@ -92,7 +92,7 @@ if is_demo_mode():
     st.info("Mode démo. Pour le quitter, utilise le menu de gauche.", icon="👀")
 
 tab_actifs, tab_repartition, tab_historique, tab_params = st.tabs([
-    "📋 Actifs", "📊 Répartition", "📈 Historique", "⚙️ Paramètres"
+    "Actifs", "Répartition", "Historique", "Paramètres"
 ])
 
 with tab_actifs:
