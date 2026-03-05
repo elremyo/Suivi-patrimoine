@@ -29,8 +29,8 @@ from services.asset_manager import (
     remove_asset, update_at_date,
 )
 from services.pricer import validate_ticker, lookup_ticker
-from services.referentiel import get_courtiers, get_enveloppes, add_courtier, add_enveloppe
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO
+from services.referentiel import get_courtiers, add_courtier
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES
 
 
 # ── Gestion de l'état des modales ─────────────────────────────────────────────
@@ -107,7 +107,7 @@ def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
     # ── Enveloppe ─────────────────────────────────────────────────────────────
     enveloppe = ""
     if show_enveloppe:
-        enveloppes = get_enveloppes()
+        enveloppes = sorted(ENVELOPPES)
 
         enveloppe_options = enveloppes[:]
         if initial_enveloppe and initial_enveloppe not in enveloppe_options:
@@ -135,12 +135,10 @@ def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
     return courtier, enveloppe
 
 
-def _save_referentiel(courtier: str, enveloppe: str):
-    """Enregistre courtier et enveloppe dans le référentiel si ce sont de nouvelles valeurs."""
+def _save_referentiel(courtier: str):
+    """Enregistre le courtier dans le référentiel si c'est une nouvelle valeur."""
     if courtier:
         add_courtier(courtier)   # idempotent : ignore si déjà présent
-    if enveloppe:
-        add_enveloppe(enveloppe) # idempotent : ignore si déjà présent
 
 
 # ── Ticker picker ─────────────────────────────────────────────────────────────
@@ -233,7 +231,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         if not courtier:
             st.warning("Le courtier / la banque est obligatoire.")
         else:
-            _save_referentiel(courtier, enveloppe)
+            _save_referentiel(courtier)
             effective_ticker = ticker_result["ticker"]
             if mode == "create":
                 with st.spinner("Ajout en cours…"):
@@ -293,7 +291,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         elif not courtier:
             st.warning("Le courtier / la banque est obligatoire.")
         else:
-            _save_referentiel(courtier, enveloppe)
+            _save_referentiel(courtier)
             if mode == "create":
                 df, msg, msg_type = create_manual_asset(
                     df, nom, categorie, montant,

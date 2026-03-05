@@ -18,7 +18,6 @@ import os
 import pandas as pd
 from pandas.errors import EmptyDataError
 from services.storage import safe_write_csv
-from constants import ENVELOPPES
 
 REFERENTIEL_PATH = "data/referentiel.csv"
 COLUMNS = ["type", "valeur"]
@@ -38,21 +37,12 @@ def init_referentiel(df_assets: pd.DataFrame | None = None):
 
     rows = []
 
-    # Enveloppes par défaut
-    for env in ENVELOPPES:
-        rows.append({"type": "enveloppe", "valeur": env})
-
-    # Valeurs déjà utilisées dans les actifs existants
+    # Courtiers déjà utilisés dans les actifs existants
     if df_assets is not None and not df_assets.empty:
         for courtier in df_assets["courtier"].dropna().unique():
             courtier = str(courtier).strip()
             if courtier:
                 rows.append({"type": "courtier", "valeur": courtier})
-
-        for env in df_assets["enveloppe"].dropna().unique():
-            env = str(env).strip()
-            if env and not any(r["type"] == "enveloppe" and r["valeur"] == env for r in rows):
-                rows.append({"type": "enveloppe", "valeur": env})
 
     df = pd.DataFrame(rows, columns=COLUMNS).drop_duplicates().reset_index(drop=True)
     safe_write_csv(df, REFERENTIEL_PATH)
@@ -75,10 +65,6 @@ def get_courtiers() -> list[str]:
     return sorted(df[df["type"] == "courtier"]["valeur"].tolist())
 
 
-def get_enveloppes() -> list[str]:
-    df = load_referentiel()
-    return sorted(df[df["type"] == "enveloppe"]["valeur"].tolist())
-
 
 # ── Ajout ─────────────────────────────────────────────────────────────────────
 
@@ -96,19 +82,6 @@ def add_courtier(valeur: str) -> tuple[bool, str]:
     return True, f"Courtier « {valeur} » ajouté."
 
 
-def add_enveloppe(valeur: str) -> tuple[bool, str]:
-    valeur = valeur.strip()
-    if not valeur:
-        return False, "Le nom de l'enveloppe ne peut pas être vide."
-    df = load_referentiel()
-    exists = ((df["type"] == "enveloppe") & (df["valeur"] == valeur)).any()
-    if exists:
-        return False, f"« {valeur} » existe déjà."
-    new_row = pd.DataFrame([{"type": "enveloppe", "valeur": valeur}])
-    df = pd.concat([df, new_row], ignore_index=True)
-    safe_write_csv(df, REFERENTIEL_PATH)
-    return True, f"Enveloppe « {valeur} » ajoutée."
-
 
 # ── Suppression ───────────────────────────────────────────────────────────────
 
@@ -123,17 +96,6 @@ def delete_courtier(valeur: str, df_assets: pd.DataFrame) -> tuple[bool, str]:
     safe_write_csv(df, REFERENTIEL_PATH)
     return True, f"Courtier « {valeur} » supprimé."
 
-
-def delete_enveloppe(valeur: str, df_assets: pd.DataFrame) -> tuple[bool, str]:
-    """Supprime une enveloppe seulement si elle n'est pas utilisée par un actif."""
-    if not df_assets.empty:
-        used = (df_assets["enveloppe"].astype(str).str.strip() == valeur).any()
-        if used:
-            return False, f"« {valeur} » est encore utilisée par un actif — modifie l'actif d'abord."
-    df = load_referentiel()
-    df = df[~((df["type"] == "enveloppe") & (df["valeur"] == valeur))].reset_index(drop=True)
-    safe_write_csv(df, REFERENTIEL_PATH)
-    return True, f"Enveloppe « {valeur} » supprimée."
 
 
 # ── Renommage ─────────────────────────────────────────────────────────────────

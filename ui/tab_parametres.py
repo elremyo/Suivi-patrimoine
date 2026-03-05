@@ -9,9 +9,9 @@ Point d'entrée unique : render(df, invalidate_cache_fn)
 import streamlit as st
 import pandas as pd
 from services.referentiel import (
-    get_courtiers, get_enveloppes,
-    add_courtier, add_enveloppe,
-    delete_courtier, delete_enveloppe,
+    get_courtiers,
+    add_courtier,
+    delete_courtier,
     rename_courtier,
 )
 
