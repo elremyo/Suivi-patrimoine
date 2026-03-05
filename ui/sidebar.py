@@ -27,7 +27,7 @@ def render_demo_mode_section(invalidate_cache_fn, flash_fn):
         "Activer les données fictives",
         value=demo_actif,
         key="toggle_demo",
-        help="Explore l'app avec des données fictives sur un an, sans saisir tes propres données.",
+        help="Explore l'app avec des données fictives sur un an. \n\n :material/info: Tes données sont sauvegardées si tu en as déjà saisi.",
     )
     if nouveau_state != demo_actif:
         if nouveau_state:

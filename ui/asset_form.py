@@ -202,7 +202,6 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
-    st.divider()
     courtier, enveloppe = _courtier_enveloppe_fields(row if mode == "edit" else None)
 
     c1, c2 = st.columns(2)
@@ -257,7 +256,6 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
-    st.divider()
     courtier, enveloppe = _courtier_enveloppe_fields(
         row if mode == "edit" else None,
         show_enveloppe=(categorie != "Immobilier"),
