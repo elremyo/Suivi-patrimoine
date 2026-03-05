@@ -12,7 +12,7 @@ from services.referentiel import (
     get_courtiers,
     add_courtier,
     delete_courtier,
-    rename_courtier,
+    rename_courtier
 )
 
 
@@ -25,12 +25,11 @@ def _render_liste(
     add_key: str,
     col_name: str,
     placeholder: str,
-    rename_fn=None,
     invalidate_cache_fn=None,
 ):
     """
     Composant générique : affiche une liste avec ajout, suppression,
-    et renommage optionnel (si rename_fn est fourni).
+    et renommage optionnel.
     """
     st.subheader(label, anchor=False)
 
@@ -70,7 +69,7 @@ def _render_liste(
                 and (df_assets[col_name].astype(str).str.strip() == item).any()
             )
 
-            if rename_fn and editing == item:
+            if editing == item:
                 # ── Mode édition inline ────────────────────────────────────────
                 c1, c2, c3 = st.columns([10, 0.9, 0.9], vertical_alignment="center")
                 nouveau_nom = c1.text_input(
@@ -80,7 +79,7 @@ def _render_liste(
                     key=f"rename_input_{add_key}_{item}",
                 )
                 if c2.button("", icon=":material/check:", key=f"confirm_rename_{add_key}_{item}", help="Confirmer", type="primary"):
-                    ok, msg, df_assets = rename_fn(item, nouveau_nom, df_assets)
+                    ok, msg, df_assets = rename_courtier(item, nouveau_nom, df_assets)
                     st.toast(msg, icon="✅" if ok else "⚠️")
                     st.session_state.pop(editing_key, None)
                     if ok:
@@ -108,17 +107,15 @@ def _render_liste(
 
             else:
                 # ── Mode affichage normal ──────────────────────────────────────
-                nb_cols = [10, 0.9, 0.9] if rename_fn else [7, 1]
+                nb_cols = [10, 0.9, 0.9]
                 cols = st.columns(nb_cols, vertical_alignment="center")
                 cols[0].write(item)
 
-                if rename_fn:
-                    if cols[1].button("", icon=":material/edit:", key=f"edit_{add_key}_{item}", help=f"Renommer « {item} »"):
-                        st.session_state[editing_key] = item
-                        st.rerun()
-                    delete_col = cols[2]
-                else:
-                    delete_col = cols[1]
+                if cols[1].button("", icon=":material/edit:", key=f"edit_{add_key}_{item}", help=f"Renommer « {item} »"):
+                    st.session_state[editing_key] = item
+                    st.rerun()
+                delete_col = cols[2]
+
 
                 if is_used:
                     delete_col.button("", icon=":material/delete:", disabled=True, key=f"del_{add_key}_{item}", help=f"Impossible : **{item}** est utilisé par un actif.")
@@ -142,6 +139,5 @@ def render(df: pd.DataFrame, invalidate_cache_fn=None):
         add_key="courtier",
         col_name="courtier",
         placeholder="Nouveau courtier…",
-        rename_fn=rename_courtier,
         invalidate_cache_fn=invalidate_cache_fn,
     )
