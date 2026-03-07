@@ -55,13 +55,12 @@ CREATE TABLE emprunts (
   duree_mois INTEGER NOT NULL,
   date_debut TEXT NOT NULL,
   date_fin TEXT,
-  capital_restant_du REAL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- date_fin peut être dérivée (date_debut + duree_mois) ou stockée pour suivi
--- capital_restant_du : mis à jour manuellement ou par un calcul d'amortissement
+-- Le capital restant dû est calculé à l'affichage (jamais stocké).
 
 
 -- =============================================================================
@@ -125,7 +124,7 @@ CREATE TABLE referentiel (
 |--------------------|--------|
 | `actifs`           | `type` détermine quelles tables de détail sont remplies. Pour `action` et `crypto` → une ligne dans `actifs_ticker`. Pour `immobilier` → une ligne dans `actifs_immobilier`. |
 | `actifs_immobilier`| `emprunt_id` optionnel : un bien peut avoir 0 ou 1 emprunt associé. |
-| `emprunts`         | Peuvent exister sans bien immobilier (prêt à la conso, etc.). `capital_restant_du` peut être recalculé à partir de l’amortissement. |
+| `emprunts`         | Peuvent exister sans bien immobilier (prêt à la conso, etc.). Le capital restant dû est calculé à l’affichage (formule d’amortissement). |
 | `historique`       | Une ligne par (asset_id, date) pour l’évolution de la valeur. |
 | `positions`        | Une ligne par (asset_id, date) pour l’évolution des quantités (actifs ticker). |
 
@@ -159,7 +158,7 @@ WHERE a.type IN ('action', 'crypto');
 **Biens immobiliers avec leur emprunt :**
 ```sql
 SELECT a.*, i.prix_achat, i.type_bien, i.adresse, i.superficie_m2,
-       e.montant_emprunte, e.taux_annuel, e.mensualite, e.duree_mois, e.capital_restant_du
+       e.montant_emprunte, e.taux_annuel, e.mensualite, e.duree_mois
 FROM actifs a
 JOIN actifs_immobilier i ON i.actif_id = a.id
 LEFT JOIN emprunts e ON e.id = i.emprunt_id;
@@ -177,12 +176,7 @@ GROUP BY type;
 SELECT SUM(montant_actuel) FROM actifs;
 ```
 
-**Patrimoine net (actifs − encours emprunts) :**
-```sql
-SELECT
-  (SELECT COALESCE(SUM(montant_actuel), 0) FROM actifs) -
-  (SELECT COALESCE(SUM(capital_restant_du), 0) FROM emprunts) AS patrimoine_net;
-```
+**Patrimoine net (actifs − encours emprunts) :** calculé dans l’app (`get_total_emprunts()` qui dérive le capital restant dû pour chaque emprunt, puis total actifs − ce total).
 
 ---
 

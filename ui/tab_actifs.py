@@ -47,6 +47,16 @@ def _render_asset_row(row: pd.Series):
         cols[0].write(row["nom"])
         if meta_str:
             cols[0].caption(meta_str)
+        if row["categorie"] == "Immobilier":
+            immo_parts = []
+            if row.get("type_bien") and str(row.get("type_bien")).strip() and str(row.get("type_bien")) != "autre":
+                immo_parts.append(str(row.get("type_bien")).strip())
+            if row.get("superficie_m2") and float(row.get("superficie_m2", 0) or 0) > 0:
+                immo_parts.append(f"{float(row['superficie_m2']):.0f} m²")
+            if row.get("adresse") and str(row.get("adresse")).strip():
+                immo_parts.append(str(row.get("adresse")).strip())
+            if immo_parts:
+                cols[0].caption(" · ".join(immo_parts))
 
     # ── Quantité (actifs auto uniquement) ─────────────────────────────────────
     if is_auto_row:
@@ -89,6 +99,7 @@ def _render_asset_row(row: pd.Series):
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     from services.assets import compute_total
+    from services.db import get_total_emprunts
 
     has_auto_assets = (
         not df.empty
@@ -114,9 +125,15 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set()
 
-    # Affichage du total
+    # Affichage des totaux
     total = compute_total(df)
-    st.metric(label="Patrimoine total", value=f"{total:,.2f} €")
+    total_emprunts = get_total_emprunts()
+    patrimoine_net = total - total_emprunts
+
+    col_total, col_emprunts, col_net = st.columns(3)
+    col_total.metric(label="Patrimoine (actifs)", value=f"{total:,.2f} €")
+    col_emprunts.metric(label="Capital restant dû (emprunts)", value=f"{total_emprunts:,.2f} €")
+    col_net.metric(label="Patrimoine net", value=f"{patrimoine_net:,.2f} €")
 
     st.space(size="small")
 

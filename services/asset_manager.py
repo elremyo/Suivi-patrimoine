@@ -55,8 +55,13 @@ def create_manual_asset(
     montant: float,
     courtier: str = "",
     enveloppe: str = "",
+    immo_params: dict | None = None,
 ) -> tuple[pd.DataFrame, str, str]:
     df = add_asset(df, nom, categorie, montant, courtier=courtier, enveloppe=enveloppe)
+    if categorie == "Immobilier" and immo_params:
+        last_idx = df.index[-1]
+        for k, v in immo_params.items():
+            df.loc[last_idx, k] = v
     asset_id = df.iloc[-1]["id"]
     record_montant(asset_id, montant)
     save_assets(df)
@@ -107,11 +112,15 @@ def edit_manual_asset(
     montant: float,
     courtier: str = "",
     enveloppe: str = "",
+    immo_params: dict | None = None,
 ) -> tuple[pd.DataFrame, str, str]:
     montant_actuel = float(df.loc[idx, "montant"])
 
     df = update_asset(df, idx, nom, categorie, montant,
                       courtier=courtier, enveloppe=enveloppe)
+    if categorie == "Immobilier" and immo_params:
+        for k, v in immo_params.items():
+            df.loc[idx, k] = v
     if montant != montant_actuel:
         record_montant(asset_id, montant)
 

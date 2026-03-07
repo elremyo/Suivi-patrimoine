@@ -22,6 +22,9 @@ ENVELOPPES = [
     "Compte courant",
 ]
 
+# Types de biens immobiliers (pour le détail immobilier)
+TYPE_BIEN_OPTIONS = ["appartement", "maison", "terrain", "local_commercial", "autre"]
+
 # Couleur fixe par catégorie (indépendant de l'ordre d'affichage)
 CATEGORY_COLOR_MAP = {
     "Actions & Fonds": "#85357d",

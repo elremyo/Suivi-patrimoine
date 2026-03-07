@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS emprunts (
   duree_mois INTEGER NOT NULL,
   date_debut TEXT NOT NULL,
   date_fin TEXT,
-  capital_restant_du REAL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

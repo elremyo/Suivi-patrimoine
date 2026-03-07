@@ -30,7 +30,8 @@ from services.asset_manager import (
 )
 from services.pricer import validate_ticker, lookup_ticker
 from services.referentiel import get_courtiers, add_courtier
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES
+from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES, TYPE_BIEN_OPTIONS
+from services.db import load_emprunts
 
 
 # ── Gestion de l'état des modales ─────────────────────────────────────────────
@@ -261,6 +262,65 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         show_enveloppe=(categorie != "Immobilier"),
     )
 
+    immo_params = None
+    if categorie == "Immobilier":
+        st.markdown("**Détail immobilier**")
+        type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "autre"
+        if type_bien_val not in TYPE_BIEN_OPTIONS:
+            type_bien_val = "autre"
+        type_bien = st.selectbox(
+            "Type de bien",
+            options=TYPE_BIEN_OPTIONS,
+            index=TYPE_BIEN_OPTIONS.index(type_bien_val),
+            key="_form_type_bien",
+        )
+        prix_achat = st.number_input(
+            "Prix d'achat (€)",
+            min_value=0.0,
+            value=float(row.get("prix_achat") or row.get("montant") or 0.0) if mode == "edit" else montant,
+            step=1000.0,
+            key="_form_prix_achat",
+        )
+        adresse = st.text_input(
+            "Adresse",
+            value=str(row.get("adresse") or "").strip() if mode == "edit" else "",
+            placeholder="Optionnel",
+            key="_form_adresse",
+        )
+        superficie = st.number_input(
+            "Superficie (m²)",
+            min_value=0.0,
+            value=float(row.get("superficie_m2") or 0.0) if mode == "edit" else 0.0,
+            step=5.0,
+            key="_form_superficie",
+        )
+        df_emprunts = load_emprunts()
+        emprunt_options = ["Aucun"] + [f"{r['nom']}" for _, r in df_emprunts.iterrows()]
+        if mode == "edit" and row is not None:
+            current_emprunt_id = row.get("emprunt_id")
+            current_emprunt_id = None if pd.isna(current_emprunt_id) or current_emprunt_id == "" else str(current_emprunt_id)
+        else:
+            current_emprunt_id = None
+        if current_emprunt_id and not df_emprunts.empty:
+            match = df_emprunts[df_emprunts["id"] == current_emprunt_id]
+            default_idx = list(df_emprunts["id"]).index(current_emprunt_id) + 1 if not match.empty else 0
+        else:
+            default_idx = 0
+        emprunt_choice = st.selectbox(
+            "Emprunt lié",
+            options=emprunt_options,
+            index=min(default_idx, len(emprunt_options) - 1),
+            key="_form_emprunt",
+        )
+        emprunt_id = None if emprunt_choice == "Aucun" else df_emprunts.iloc[emprunt_options.index(emprunt_choice) - 1]["id"]
+        immo_params = {
+            "prix_achat": prix_achat,
+            "type_bien": type_bien,
+            "adresse": adresse.strip() or None,
+            "superficie_m2": superficie if superficie > 0 else None,
+            "emprunt_id": emprunt_id,
+        }
+
     c1, c2 = st.columns(2)
     if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
         _close_dialog()
@@ -277,11 +337,13 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
                 df, msg, msg_type = create_manual_asset(
                     df, nom, categorie, montant,
                     courtier=courtier, enveloppe=enveloppe,
+                    immo_params=immo_params,
                 )
             else:
                 df, msg, msg_type = edit_manual_asset(
                     df, idx, row["id"], nom, categorie, montant,
                     courtier=courtier, enveloppe=enveloppe,
+                    immo_params=immo_params,
                 )
             flash_fn(msg, msg_type)
             _close_dialog()

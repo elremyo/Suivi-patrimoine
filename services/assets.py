@@ -1,6 +1,6 @@
 import uuid
 import pandas as pd
-from services.storage import load_assets
+from services.storage import load_assets, COLUMNS
 
 
 def get_assets() -> pd.DataFrame:
@@ -14,9 +14,10 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
     if ticker and quantite > 0 and pru > 0:
         montant = round(pru * quantite, 2)
     asset_id = str(uuid.uuid4())
+    # Toujours 9 colonnes de base ; le df peut en avoir plus (détail immobilier) → concat aligne
     new_row = pd.DataFrame(
         [[asset_id, nom, categorie, montant, ticker, quantite, pru, courtier, enveloppe]],
-        columns=df.columns
+        columns=COLUMNS,
     )
     if df.empty:
         df = new_row.reset_index(drop=True)

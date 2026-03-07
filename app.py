@@ -12,10 +12,12 @@ from services.historique import init_historique, load_historique, build_total_ev
 from services.positions import init_positions, load_positions
 from services.referentiel import init_referentiel
 from ui.tab_actifs import render as render_actifs
+from ui.tab_emprunts import render as render_emprunts
 from ui.tab_historique import render as render_historique
 from ui.tab_repartition import render as render_repartition
 from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog
+from ui.emprunt_form import render_emprunt_dialog
 from ui.sidebar import render as render_sidebar
 from services.demo_mode import is_demo_mode
 
@@ -78,6 +80,7 @@ render_sidebar(df, invalidate_data_cache, flash)
 # ── Modales ───────────────────────────────────────────────────────────────────
 
 render_active_dialog(df, invalidate_data_cache, flash)
+render_emprunt_dialog(flash)
 
 
 # ── Page principale ───────────────────────────────────────────────────────────
@@ -91,12 +94,15 @@ st.title("Suivi de patrimoine", anchor=False)
 if is_demo_mode():
     st.info("Mode démo. Pour le quitter, utilise le menu de gauche.", icon="👀")
 
-tab_actifs, tab_repartition, tab_historique, tab_params = st.tabs([
-    "Actifs", "Répartition", "Historique", "Paramètres"
+tab_actifs, tab_emprunts, tab_repartition, tab_historique, tab_params = st.tabs([
+    "Actifs", "Emprunts", "Répartition", "Historique", "Paramètres"
 ])
 
 with tab_actifs:
     render_actifs(df, invalidate_data_cache, flash)
+
+with tab_emprunts:
+    render_emprunts(flash)
 
 with tab_repartition:
     render_repartition(df)
