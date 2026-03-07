@@ -3,7 +3,7 @@ services/referentiel.py
 ────────────────────────
 Gestion du référentiel courtiers et enveloppes.
 
-Le référentiel est stocké dans data/referentiel.csv avec deux colonnes :
+Le référentiel est stocké dans data/referentiel.csv (ou table referentiel en SQLite).
     type  : "courtier" | "enveloppe"
     valeur: la valeur (ex. "Boursorama", "PEA")
 
@@ -17,6 +17,7 @@ Règles :
 import os
 import pandas as pd
 from pandas.errors import EmptyDataError
+from constants import USE_SQLITE
 from services.storage import safe_write_csv
 
 REFERENTIEL_PATH = "data/referentiel.csv"
@@ -27,11 +28,13 @@ COLUMNS = ["type", "valeur"]
 
 def init_referentiel(df_assets: pd.DataFrame | None = None):
     """
-    Crée le fichier référentiel s'il n'existe pas.
-    Pré-remplit avec :
-      - les enveloppes par défaut de constants.py
-      - les courtiers et enveloppes déjà présents dans les actifs existants
+    Crée le fichier référentiel (ou table) s'il n'existe pas.
+    Pré-remplit avec les enveloppes par défaut et les courtiers des actifs.
     """
+    if USE_SQLITE:
+        from services import db
+        db.init_referentiel_from_assets(df_assets)
+        return
     if os.path.exists(REFERENTIEL_PATH):
         return
 
@@ -49,6 +52,9 @@ def init_referentiel(df_assets: pd.DataFrame | None = None):
 
 
 def load_referentiel() -> pd.DataFrame:
+    if USE_SQLITE:
+        from services import db
+        return db.load_referentiel()
     try:
         df = pd.read_csv(REFERENTIEL_PATH)
         if df.empty or list(df.columns) != COLUMNS:
@@ -69,6 +75,9 @@ def get_courtiers() -> list[str]:
 # ── Ajout ─────────────────────────────────────────────────────────────────────
 
 def add_courtier(valeur: str) -> tuple[bool, str]:
+    if USE_SQLITE:
+        from services import db
+        return db.add_courtier(valeur)
     valeur = valeur.strip()
     if not valeur:
         return False, "Le nom du courtier ne peut pas être vide."
@@ -87,6 +96,9 @@ def add_courtier(valeur: str) -> tuple[bool, str]:
 
 def delete_courtier(valeur: str, df_assets: pd.DataFrame) -> tuple[bool, str]:
     """Supprime un courtier seulement s'il n'est pas utilisé par un actif."""
+    if USE_SQLITE:
+        from services import db
+        return db.delete_courtier(valeur, df_assets)
     if not df_assets.empty:
         used = (df_assets["courtier"].astype(str).str.strip() == valeur).any()
         if used:
@@ -105,6 +117,9 @@ def rename_courtier(ancien: str, nouveau: str, df_assets: pd.DataFrame) -> tuple
     Renomme un courtier dans le référentiel ET dans tous les actifs concernés.
     Retourne (succès, message, df_assets_mis_à_jour).
     """
+    if USE_SQLITE:
+        from services import db
+        return db.rename_courtier(ancien, nouveau, df_assets)
     nouveau = nouveau.strip()
     if not nouveau:
         return False, "Le nouveau nom ne peut pas être vide.", df_assets
@@ -123,6 +138,7 @@ def rename_courtier(ancien: str, nouveau: str, df_assets: pd.DataFrame) -> tuple
     # Mise à jour des actifs concernés
     if not df_assets.empty:
         mask = df_assets["courtier"].astype(str).str.strip() == ancien
+        df_assets = df_assets.copy()
         df_assets.loc[mask, "courtier"] = nouveau
         from constants import DATA_PATH
         safe_write_csv(df_assets, DATA_PATH)

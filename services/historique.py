@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from datetime import date
 from pandas.errors import EmptyDataError
-from constants import HISTORIQUE_PATH, CACHE_TTL_SECONDS
+from constants import HISTORIQUE_PATH, CACHE_TTL_SECONDS, USE_SQLITE
 from services.storage import safe_write_csv
 
 
@@ -11,11 +11,16 @@ COLUMNS = ["asset_id", "date", "montant"]
 
 
 def init_historique():
+    if USE_SQLITE:
+        return  # tables créées par init_storage -> db.init_db()
     if not os.path.exists(HISTORIQUE_PATH):
         safe_write_csv(pd.DataFrame(columns=COLUMNS), HISTORIQUE_PATH)
 
 
 def load_historique() -> pd.DataFrame:
+    if USE_SQLITE:
+        from services import db
+        return db.load_historique()
     try:
         df = pd.read_csv(HISTORIQUE_PATH, parse_dates=["date"])
         if df.empty or list(df.columns) != COLUMNS:
@@ -30,6 +35,10 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
     Enregistre le montant d'un actif manuel à une date donnée.
     Si un enregistrement existe déjà pour ce jour et cet actif, il est écrasé.
     """
+    if USE_SQLITE:
+        from services import db
+        db.record_montant(asset_id, montant, record_date)
+        return
     d = pd.Timestamp(record_date or date.today())
     df = load_historique()
 
@@ -48,6 +57,10 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
 
 def delete_asset_history(asset_id: str):
     """Supprime tout l'historique d'un actif (utile à la suppression d'un actif)."""
+    if USE_SQLITE:
+        from services import db
+        db.delete_asset_history(asset_id)
+        return
     df = load_historique()
     if df.empty:
         return

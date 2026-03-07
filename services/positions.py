@@ -2,18 +2,23 @@ import os
 import pandas as pd
 from datetime import date
 from pandas.errors import EmptyDataError
-from constants import POSITIONS_PATH
+from constants import POSITIONS_PATH, USE_SQLITE
 from services.storage import safe_write_csv
 
 COLUMNS = ["asset_id", "date", "quantite"]
 
 
 def init_positions():
+    if USE_SQLITE:
+        return  # tables créées par init_storage -> db.init_db()
     if not os.path.exists(POSITIONS_PATH):
         safe_write_csv(pd.DataFrame(columns=COLUMNS), POSITIONS_PATH)
 
 
 def load_positions() -> pd.DataFrame:
+    if USE_SQLITE:
+        from services import db
+        return db.load_positions()
     try:
         df = pd.read_csv(POSITIONS_PATH, parse_dates=["date"])
         if df.empty or list(df.columns) != COLUMNS:
@@ -28,6 +33,10 @@ def record_position(asset_id: str, quantite: float, record_date: date | None = N
     Enregistre la quantité détenue pour un actif à une date donnée.
     Si un enregistrement existe déjà pour ce jour, il est écrasé.
     """
+    if USE_SQLITE:
+        from services import db
+        db.record_position(asset_id, quantite, record_date)
+        return
     d = pd.Timestamp(record_date or date.today())
     df = load_positions()
 
@@ -48,6 +57,10 @@ def record_position(asset_id: str, quantite: float, record_date: date | None = N
 
 def delete_asset_positions(asset_id: str):
     """Supprime toutes les positions d'un actif (utile à la suppression d'un actif)."""
+    if USE_SQLITE:
+        from services import db
+        db.delete_asset_positions(asset_id)
+        return
     df = load_positions()
     if df.empty:
         return

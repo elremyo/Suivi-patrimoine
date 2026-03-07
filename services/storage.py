@@ -3,7 +3,7 @@ import uuid
 import pandas as pd
 from filelock import FileLock
 from pandas.errors import EmptyDataError
-from constants import DATA_PATH, HISTORIQUE_PATH, POSITIONS_PATH
+from constants import DATA_PATH, HISTORIQUE_PATH, POSITIONS_PATH, USE_SQLITE
 
 COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
 HISTORIQUE_COLUMNS = ["asset_id", "date", "montant"]
@@ -30,13 +30,20 @@ def safe_write_csv(df: pd.DataFrame, path: str) -> None:
 
 
 def init_storage():
-    """Crée le fichier s'il n'existe pas."""
+    """Crée le fichier (CSV ou DB) s'il n'existe pas."""
+    if USE_SQLITE:
+        from services import db
+        db.init_db()
+        return
     if not os.path.exists(DATA_PATH):
         df = pd.DataFrame(columns=COLUMNS)
         safe_write_csv(df, DATA_PATH)
 
 
 def load_assets():
+    if USE_SQLITE:
+        from services import db
+        return db.load_assets()
     try:
         df = pd.read_csv(DATA_PATH)
         if df.empty and list(df.columns) not in [COLUMNS]:
@@ -65,6 +72,10 @@ def load_assets():
 
 
 def save_assets(df):
+    if USE_SQLITE:
+        from services import db
+        db.save_assets(df)
+        return
     safe_write_csv(df, DATA_PATH)
 
 
@@ -76,6 +87,9 @@ def download_assets(df: pd.DataFrame) -> bytes:
 
 def download_historique() -> bytes:
     """Lit et retourne le fichier historique en bytes pour téléchargement."""
+    if USE_SQLITE:
+        from services import db
+        return db.download_historique_bytes()
     try:
         df = pd.read_csv(HISTORIQUE_PATH)
     except (EmptyDataError, FileNotFoundError):
@@ -85,6 +99,9 @@ def download_historique() -> bytes:
 
 def download_positions() -> bytes:
     """Lit et retourne le fichier positions en bytes pour téléchargement."""
+    if USE_SQLITE:
+        from services import db
+        return db.download_positions_bytes()
     try:
         df = pd.read_csv(POSITIONS_PATH)
     except (EmptyDataError, FileNotFoundError):
@@ -119,7 +136,11 @@ def import_assets(uploaded_file) -> tuple[bool, str]:
                               ("courtier", ""), ("enveloppe", "")]:
             if col not in df.columns:
                 df[col] = default
-        safe_write_csv(df, DATA_PATH)
+        if USE_SQLITE:
+            from services import db
+            db.save_assets(df)
+        else:
+            safe_write_csv(df, DATA_PATH)
         return True, f"{len(df)} actif(s) importé(s) avec succès."
     except Exception as e:
         return False, f"Erreur lors de l'import des actifs : {e}"
@@ -135,7 +156,22 @@ def import_historique(uploaded_file) -> tuple[bool, str]:
         ok, err = _validate_columns(df, HISTORIQUE_COLUMNS, "historique")
         if not ok:
             return False, err
-        safe_write_csv(df, HISTORIQUE_PATH)
+        if USE_SQLITE:
+            from services import db
+            conn = db.get_conn()
+            try:
+                conn.execute("DELETE FROM historique")
+                for _, row in df.iterrows():
+                    d = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
+                    conn.execute(
+                        "INSERT INTO historique (asset_id, date, montant) VALUES (?, ?, ?)",
+                        (str(row["asset_id"]), d, float(row["montant"])),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+        else:
+            safe_write_csv(df, HISTORIQUE_PATH)
         return True, f"{len(df)} entrée(s) d'historique importée(s) avec succès."
     except Exception as e:
         return False, f"Erreur lors de l'import de l'historique : {e}"
@@ -151,7 +187,22 @@ def import_positions(uploaded_file) -> tuple[bool, str]:
         ok, err = _validate_columns(df, POSITIONS_COLUMNS, "positions")
         if not ok:
             return False, err
-        safe_write_csv(df, POSITIONS_PATH)
+        if USE_SQLITE:
+            from services import db
+            conn = db.get_conn()
+            try:
+                conn.execute("DELETE FROM positions")
+                for _, row in df.iterrows():
+                    d = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
+                    conn.execute(
+                        "INSERT INTO positions (asset_id, date, quantite) VALUES (?, ?, ?)",
+                        (str(row["asset_id"]), d, float(row["quantite"])),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+        else:
+            safe_write_csv(df, POSITIONS_PATH)
         return True, f"{len(df)} position(s) importée(s) avec succès."
     except Exception as e:
         return False, f"Erreur lors de l'import des positions : {e}"

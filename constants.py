@@ -46,6 +46,10 @@ PLOTLY_LAYOUT = dict(
 DATA_PATH       = "data/patrimoine.csv"
 HISTORIQUE_PATH = "data/historique.csv"
 POSITIONS_PATH  = "data/positions.csv"
+DB_PATH         = "data/patrimoine.db"
+
+# Stockage : False = CSV (par défaut), True = SQLite
+USE_SQLITE = False
 
 # ── Cache yfinance ────────────────────────────────────────────────────────────
 
