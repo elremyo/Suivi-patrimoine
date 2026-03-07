@@ -8,7 +8,7 @@ et data/referentiel.csv (si présent) puis remplit la base data/patrimoine.db.
 Usage (depuis la racine du projet) :
     python scripts/migrate_csv_to_sqlite.py
 
-Après migration, passer USE_SQLITE = True dans constants.py pour utiliser la base.
+L'application utilise par défaut la base SQLite (data/patrimoine.db).
 """
 
 import os
@@ -145,8 +145,7 @@ def main():
         print("  Référentiel : initialisé depuis actifs + enveloppes par défaut")
 
     print("-" * 40)
-    print("Migration terminée.")
-    print("Pour utiliser la base : dans constants.py, passer USE_SQLITE = True")
+    print("Migration terminée. L'application utilise la base SQLite.")
 
 
 if __name__ == "__main__":

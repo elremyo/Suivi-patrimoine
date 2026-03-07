@@ -1,33 +1,18 @@
-import os
 import pandas as pd
 import streamlit as st
 from datetime import date
-from pandas.errors import EmptyDataError
-from constants import HISTORIQUE_PATH, CACHE_TTL_SECONDS, USE_SQLITE
-from services.storage import safe_write_csv
 
-
-COLUMNS = ["asset_id", "date", "montant"]
+from constants import CACHE_TTL_SECONDS
+from services import db
 
 
 def init_historique():
-    if USE_SQLITE:
-        return  # tables créées par init_storage -> db.init_db()
-    if not os.path.exists(HISTORIQUE_PATH):
-        safe_write_csv(pd.DataFrame(columns=COLUMNS), HISTORIQUE_PATH)
+    """Les tables sont créées par init_storage (db.init_db())."""
+    pass
 
 
 def load_historique() -> pd.DataFrame:
-    if USE_SQLITE:
-        from services import db
-        return db.load_historique()
-    try:
-        df = pd.read_csv(HISTORIQUE_PATH, parse_dates=["date"])
-        if df.empty or list(df.columns) != COLUMNS:
-            return pd.DataFrame(columns=COLUMNS)
-        return df
-    except (EmptyDataError, FileNotFoundError):
-        return pd.DataFrame(columns=COLUMNS)
+    return db.load_historique()
 
 
 def record_montant(asset_id: str, montant: float, record_date: date | None = None):
@@ -35,37 +20,12 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
     Enregistre le montant d'un actif manuel à une date donnée.
     Si un enregistrement existe déjà pour ce jour et cet actif, il est écrasé.
     """
-    if USE_SQLITE:
-        from services import db
-        db.record_montant(asset_id, montant, record_date)
-        return
-    d = pd.Timestamp(record_date or date.today())
-    df = load_historique()
-
-    if not df.empty:
-        df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
-
-    new_row = pd.DataFrame([[asset_id, d, montant]], columns=COLUMNS)
-    if df.empty:
-        df = new_row.reset_index(drop=True)
-    else:
-        df = pd.concat([df, new_row], ignore_index=True)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
-    safe_write_csv(df, HISTORIQUE_PATH)
+    db.record_montant(asset_id, montant, record_date)
 
 
 def delete_asset_history(asset_id: str):
     """Supprime tout l'historique d'un actif (utile à la suppression d'un actif)."""
-    if USE_SQLITE:
-        from services import db
-        db.delete_asset_history(asset_id)
-        return
-    df = load_historique()
-    if df.empty:
-        return
-    df = df[df["asset_id"] != asset_id].reset_index(drop=True)
-    safe_write_csv(df, HISTORIQUE_PATH)
+    db.delete_asset_history(asset_id)
 
 
 def get_montant_at(asset_id: str, at_date: pd.Timestamp, df_hist: pd.DataFrame) -> float | None:
@@ -109,7 +69,7 @@ def build_category_evolution(
     df_hist: pd.DataFrame,
     df_positions: pd.DataFrame,
     df_prices: pd.DataFrame,
-    categories_auto: tuple,  # tuple pour être hashable par st.cache_data
+    categories_auto: tuple,
 ) -> pd.DataFrame:
     """
     Retourne un DataFrame pivot date × catégorie avec la valeur de chaque catégorie
@@ -130,7 +90,7 @@ def build_asset_evolution(
     df_hist: pd.DataFrame,
     df_positions: pd.DataFrame,
     df_prices: pd.DataFrame,
-    categories_auto: tuple,  # tuple pour être hashable par st.cache_data
+    categories_auto: tuple,
 ) -> pd.DataFrame:
     """
     Retourne un DataFrame pivot date × nom d'actif avec la valeur de chaque actif
@@ -145,8 +105,6 @@ def build_asset_evolution(
     return pivot.sort_index()
 
 
-# ── Cœur du calcul — fonction privée ─────────────────────────────────────────
-
 def _compute_raw_evolution(
     df_assets: pd.DataFrame,
     df_hist: pd.DataFrame,
@@ -156,16 +114,7 @@ def _compute_raw_evolution(
 ) -> pd.DataFrame:
     """
     Calcule la valeur de chaque actif à chaque date disponible.
-
-    Retourne un DataFrame à format long :
-        date | asset_id | nom | categorie | valeur
-
-    C'est la source unique utilisée par build_total_evolution,
-    build_category_evolution et build_asset_evolution.
-
-    Approche vectorisée : on boucle sur les actifs (ex. 10),
-    pas sur dates × actifs (ex. 3 650). Pour chaque actif,
-    merge_asof résout toutes les dates en une seule opération pandas.
+    Retourne un DataFrame à format long : date | asset_id | nom | categorie | valeur
     """
     if df_assets.empty:
         return pd.DataFrame()
@@ -185,9 +134,6 @@ def _compute_raw_evolution(
     manual_assets = df_assets[~auto_mask]
     auto_assets = df_assets[auto_mask]
 
-    # ── Actifs manuels ────────────────────────────────────────────────────────
-    # Pour chaque actif manuel : merge_asof entre toutes les dates et son historique.
-    # Cela retourne, pour chaque date, le dernier montant connu avant cette date.
     if not manual_assets.empty and not df_hist.empty:
         hist_sorted = df_hist.sort_values("date")
         for _, asset in manual_assets.iterrows():
@@ -203,44 +149,33 @@ def _compute_raw_evolution(
             merged = merged.dropna(subset=["montant"])
             if merged.empty:
                 continue
-            merged["asset_id"]  = asset["id"]
-            merged["nom"]       = asset["nom"]
+            merged["asset_id"] = asset["id"]
+            merged["nom"] = asset["nom"]
             merged["categorie"] = asset["categorie"]
             merged = merged.rename(columns={"montant": "valeur"})
             parts.append(merged[["date", "asset_id", "nom", "categorie", "valeur"]])
 
-    # ── Actifs automatiques ───────────────────────────────────────────────────
-    # On convertit df_prices en format long (date, ticker, price) une seule fois,
-    # puis pour chaque actif auto on fait deux merge_asof :
-    #   1. prix historique à chaque date
-    #   2. quantité détenue à chaque date
-    # La valeur est ensuite prix × quantité.
     if not auto_assets.empty and not df_prices.empty and not df_positions.empty:
         prices_long = df_prices.stack().reset_index()
         prices_long.columns = ["date", "ticker", "price"]
         prices_long["date"] = pd.to_datetime(prices_long["date"]).dt.normalize()
         prices_long = prices_long.sort_values("date")
-
         positions_sorted = df_positions.sort_values("date")
 
         for _, asset in auto_assets.iterrows():
             ticker = asset["ticker"]
             if ticker not in df_prices.columns:
                 continue
-
             asset_prices = prices_long[prices_long["ticker"] == ticker]
             asset_positions = positions_sorted[positions_sorted["asset_id"] == asset["id"]]
             if asset_positions.empty:
                 continue
-
-            # Pour chaque date (y compris weekends), trouver le dernier prix connu
             merged = pd.merge_asof(
                 dates_df,
                 asset_prices[["date", "price"]],
                 on="date",
                 direction="backward",
             )
-            # Puis trouver la dernière quantité connue à chaque date
             merged = pd.merge_asof(
                 merged,
                 asset_positions[["date", "quantite"]],
@@ -250,20 +185,16 @@ def _compute_raw_evolution(
             merged = merged.dropna(subset=["quantite", "price"])
             if merged.empty:
                 continue
-
-            merged["valeur"]    = (merged["price"] * merged["quantite"]).round(2)
-            merged["asset_id"]  = asset["id"]
-            merged["nom"]       = asset["nom"]
+            merged["valeur"] = (merged["price"] * merged["quantite"]).round(2)
+            merged["asset_id"] = asset["id"]
+            merged["nom"] = asset["nom"]
             merged["categorie"] = asset["categorie"]
             parts.append(merged[["date", "asset_id", "nom", "categorie", "valeur"]])
 
     if not parts:
         return pd.DataFrame()
-
     return pd.concat(parts, ignore_index=True)
 
-
-# ── Helpers privés ────────────────────────────────────────────────────────────
 
 def _collect_all_dates(df_hist: pd.DataFrame, df_prices: pd.DataFrame) -> pd.DatetimeIndex:
     """Collecte toutes les dates disponibles dans les deux sources."""

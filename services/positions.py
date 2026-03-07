@@ -1,71 +1,28 @@
-import os
 import pandas as pd
-from datetime import date
-from pandas.errors import EmptyDataError
-from constants import POSITIONS_PATH, USE_SQLITE
-from services.storage import safe_write_csv
 
-COLUMNS = ["asset_id", "date", "quantite"]
+from services import db
 
 
 def init_positions():
-    if USE_SQLITE:
-        return  # tables créées par init_storage -> db.init_db()
-    if not os.path.exists(POSITIONS_PATH):
-        safe_write_csv(pd.DataFrame(columns=COLUMNS), POSITIONS_PATH)
+    """Les tables sont créées par init_storage (db.init_db())."""
+    pass
 
 
 def load_positions() -> pd.DataFrame:
-    if USE_SQLITE:
-        from services import db
-        return db.load_positions()
-    try:
-        df = pd.read_csv(POSITIONS_PATH, parse_dates=["date"])
-        if df.empty or list(df.columns) != COLUMNS:
-            return pd.DataFrame(columns=COLUMNS)
-        return df
-    except (EmptyDataError, FileNotFoundError):
-        return pd.DataFrame(columns=COLUMNS)
+    return db.load_positions()
 
 
-def record_position(asset_id: str, quantite: float, record_date: date | None = None):
+def record_position(asset_id: str, quantite: float, record_date=None):
     """
     Enregistre la quantité détenue pour un actif à une date donnée.
     Si un enregistrement existe déjà pour ce jour, il est écrasé.
     """
-    if USE_SQLITE:
-        from services import db
-        db.record_position(asset_id, quantite, record_date)
-        return
-    d = pd.Timestamp(record_date or date.today())
-    df = load_positions()
-
-    if not df.empty:
-        df = df[~((df["asset_id"] == asset_id) & (df["date"] == d))]
-
-    new_row = pd.DataFrame([[asset_id, d, quantite]], columns=COLUMNS)
-    # Évite le FutureWarning pandas : concat avec un DataFrame vide
-    # se comportera différemment dans les prochaines versions
-    if df.empty:
-        df = new_row.reset_index(drop=True)
-    else:
-        df = pd.concat([df, new_row], ignore_index=True)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values(["asset_id", "date"]).reset_index(drop=True)
-    safe_write_csv(df, POSITIONS_PATH)
+    db.record_position(asset_id, quantite, record_date)
 
 
 def delete_asset_positions(asset_id: str):
     """Supprime toutes les positions d'un actif (utile à la suppression d'un actif)."""
-    if USE_SQLITE:
-        from services import db
-        db.delete_asset_positions(asset_id)
-        return
-    df = load_positions()
-    if df.empty:
-        return
-    df = df[df["asset_id"] != asset_id].reset_index(drop=True)
-    safe_write_csv(df, POSITIONS_PATH)
+    db.delete_asset_positions(asset_id)
 
 
 def get_quantity_at(asset_id: str, at_date: pd.Timestamp, df_positions: pd.DataFrame) -> float | None:
