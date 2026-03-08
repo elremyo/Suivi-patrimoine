@@ -25,15 +25,9 @@ def _render_kpis(df: pd.DataFrame):
     patrimoine_net = total_actifs - total_passifs
 
     col_total, col_passifs, col_net = st.columns(3)
-    col_total.metric(label="Patrimoine brut (actifs)", value=f"{total_actifs:,.2f} €")
+    col_total.metric(label="Patrimoine brut", value=f"{total_actifs:,.2f} €")
     col_passifs.metric(label="Total passifs (emprunts)", value=f"{total_passifs:,.2f} €")
-    col_net.metric(
-        label="Patrimoine net",
-        value=f"{patrimoine_net:,.2f} €",
-        delta=f"−{total_passifs:,.0f} € de dettes" if total_passifs > 0 else None,
-        delta_color="inverse",
-        delta_arrow="off",
-    )
+    col_net.metric(label="Patrimoine net", value=f"{patrimoine_net:,.2f} €")
 
 
 # ── Répartition actifs par catégorie (cartes) ────────────────────────────────
@@ -43,7 +37,7 @@ def _render_repartition_actifs(df: pd.DataFrame):
     if stats.empty:
         return
 
-    st.subheader("Actifs par catégorie", anchor=False)
+    st.subheader("Actifs", anchor=False)
 
     # Calcul du PnL par catégorie (uniquement pour les catégories auto)
     pnl_by_cat: dict[str, float] = {}
@@ -57,8 +51,8 @@ def _render_repartition_actifs(df: pd.DataFrame):
             pnl_by_cat[categorie] = valeur_actuelle - valeur_achat
 
     # En-tête de la liste
-    header_cols = st.columns([3, 1.5, 2, 2])
-    header_cols[0].caption("Catégorie")
+    header_cols = st.columns([5, 1, 1, 1])
+    header_cols[0].empty()
     header_cols[1].caption("Répartition")
     header_cols[2].caption("Valeur")
     header_cols[3].caption("Plus/moins-value")
@@ -69,7 +63,7 @@ def _render_repartition_actifs(df: pd.DataFrame):
         pnl = pnl_by_cat.get(categorie)
 
         with st.container(border=True):
-            cols = st.columns([3, 1.5, 2, 2])
+            cols = st.columns([5, 1, 1, 1])
 
             # Nom coloré
             cols[0].markdown(
@@ -116,42 +110,49 @@ def _render_enveloppes(df: pd.DataFrame):
 
 # ── Résumé des passifs ────────────────────────────────────────────────────────
 
-def _render_passifs(df_emprunts: pd.DataFrame):
+def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
     if df_emprunts.empty:
         return
 
     st.subheader("Passifs", anchor=False)
 
+    cols_entete = st.columns([5, 1, 1, 1])
+    cols_entete[1].caption("Part du patrimoine")
+    cols_entete[2].caption("Emprunté")
+    cols_entete[3].caption("Restant dû")
+
     for _, row in df_emprunts.iterrows():
         crd = row.get("capital_restant_du")
         crd_str = f"{crd:,.0f} €" if crd is not None and not pd.isna(crd) else "—"
+        pct = (crd / total_actifs * 100) if (total_actifs > 0 and crd is not None and not pd.isna(crd)) else None
+        pct_str = f"{pct:.1f} %" if pct is not None else "—"
+
         with st.container(border=True):
-            cols = st.columns([4, 2, 2, 2])
+            cols = st.columns([5, 1, 1, 1])
             cols[0].markdown(f"**{row['nom']}**")
-            cols[1].caption("Emprunté")
-            cols[1].write(f"{row['montant_emprunte']:,.0f} €")
-            cols[2].caption("Mensualité")
-            cols[2].write(f"{row['mensualite']:,.0f} €")
-            cols[3].caption("Restant dû")
+            cols[1].write(pct_str)
+            cols[2].write(f"{row['montant_emprunte']:,.0f} €")
             cols[3].write(crd_str)
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame):
+    total_actifs = compute_total(df) if not df.empty else 0.0
+
     _render_kpis(df)
 
     if df.empty:
         st.info("Aucun actif enregistré. Ajoute des actifs pour voir la synthèse.")
         return
 
-    st.divider()
     _render_repartition_actifs(df)
 
-    st.divider()
-    _render_enveloppes(df)
 
     df_emprunts = load_emprunts()
     if not df_emprunts.empty:
         st.divider()
-        _render_passifs(df_emprunts)
+        _render_passifs(df_emprunts, total_actifs)
+
+    st.divider()
+    _render_enveloppes(df)

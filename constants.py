@@ -25,13 +25,14 @@ ENVELOPPES = [
 # Types de biens immobiliers (pour le détail immobilier)
 TYPE_BIEN_OPTIONS = ["appartement", "maison", "terrain", "local_commercial", "autre"]
 
-# Couleur fixe par catégorie (indépendant de l'ordre d'affichage)
+# Couleur fixe par catégorie
 CATEGORY_COLOR_MAP = {
     "Actions & Fonds": "#85357d",
     "Crypto":          "#6f50e5",
     "Livrets":         "#486df0",
     "Immobilier":      "#d6475d",
     "Fonds euros":     "#f08696",
+    "Emprunts":        "#75cbd1",
 }
 
 PLOTLY_LAYOUT = dict(
