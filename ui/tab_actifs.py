@@ -2,7 +2,7 @@
 ui/tab_actifs.py
 ───────────────────
 Contenu du tab "Actifs" : liste des actifs.
-Les métriques globales (total actifs / passifs / net) sont dans tab_synthese.py.
+Les métriques globales (actifs / passifs / net) sont dans tab_synthese.py.
 Les modales sont gérées via ui/asset_form.py.
 Les exports, imports, mode démo et réinitialisation sont dans ui/sidebar.py.
 """
@@ -98,6 +98,7 @@ def _render_asset_row(row: pd.Series):
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
+    from services.assets import compute_total
 
     has_auto_assets = (
         not df.empty
@@ -123,28 +124,93 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
         st.session_state["sync_error_tickers"] = set()
 
-    # ── Barre d'actions ───────────────────────────────────────────────────────
-    col_btn, col_sync = st.columns([6, 2], vertical_alignment="center")
+    # ── Métriques de l'onglet Actifs ──────────────────────────────────────────
+    total = compute_total(df)
 
-    with col_btn:
-        if st.button("+ Ajouter un actif", type="primary", key="btn_add_asset"):
-            set_dialog_create()
-            st.rerun()
+    # PnL global sur les actifs cotés uniquement (ceux avec PRU)
+    df_auto = df[df["categorie"].isin(CATEGORIES_AUTO)]
+    has_pnl = not df_auto.empty and (df_auto["pru"] > 0).any() and (df_auto["quantite"] > 0).any()
 
-    if has_auto_assets:
-        sync_time = st.session_state.get("sync_time", "")
-        with col_sync:
-            st.caption(f":grey[Dernière synchro : {sync_time}]" if sync_time else "")
+    with st.container(vertical_alignment="center"):
+        if has_pnl:
+            valeur_achat_totale = (df_auto["pru"] * df_auto["quantite"]).sum()
+            pnl_global = df_auto["montant"].sum() - valeur_achat_totale
+            pnl_pct = (pnl_global / valeur_achat_totale * 100) if valeur_achat_totale else 0
+            sign = "+" if pnl_global >= 0 else ""
+            st.metric(label="Total actifs", value=f"{total:,.2f} €",delta=f"{sign}{pnl_global:,.2f} € ({sign}{pnl_pct:.1f}%)")
+        else:
+            st.metric(label="Total actifs", value=f"{total:,.2f} €")
+
+
 
     st.space(size="small")
 
+    # ── Boutons d'action ──────────────────────────────────────────────────────
+    if not df.empty:
+        with st.container(horizontal=True, vertical_alignment="center"):
+            with st.container(horizontal=True, vertical_alignment="center"):
+                if st.button(
+                    "",
+                    icon=":material/refresh:",
+                    disabled=not has_auto_assets,
+                    help="Actualiser les prix",
+                    key="btn_refresh_prices",
+                    type="tertiary"
+                ):
+                    with st.spinner("Récupération des prix…"):
+                        df, msg, msg_type = refresh_prices(df)
+                    flash_fn(msg, msg_type)
+                    st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+                    st.session_state["sync_error_tickers"] = set(
+                        msg.replace("Tickers introuvables : ", "").split(", ")
+                    ) if msg_type == "warning" else set()
+                    invalidate_cache_fn()
+                    st.rerun()
+                if has_auto_assets and "sync_time" in st.session_state:
+                    st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
+
+            if st.button(
+                "Compléter mon patrimoine",
+                icon=":material/add:",
+                type="primary",
+                key="btn_add_asset",
+            ):
+                set_dialog_create()
+                st.rerun()
+
     # ── Liste des actifs ──────────────────────────────────────────────────────
     if df.empty:
-        st.info("Aucun actif pour l'instant. Clique sur « + Ajouter un actif » pour commencer.")
-        return df
-
-    for _, row in df.iterrows():
         with st.container(border=True):
-            _render_asset_row(row)
+            st.markdown("### Bienvenue sur ton suivi de patrimoine 👋")
+            st.markdown(" ")
+            st.markdown("**1. Ajoute tes actifs**")
+            st.caption("Livrets, immobilier, actions, crypto, fonds euros — tous tes placements au même endroit.")
+            st.markdown("**2. Les prix se mettent à jour automatiquement**")
+            st.caption("Pour tes actions et cryptos, l'app récupère les cours en temps réel via Yahoo Finance.")
+            st.markdown("**3. Suis l'évolution de ton patrimoine**")
+            st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
+            if st.button("+ Ajouter mon premier actif", type="primary", use_container_width=True, key="btn_empty_state"):
+                set_dialog_create()
+                st.rerun()
+            st.divider()
+            st.markdown("**Pas encore prêt à saisir tes données ?**")
+            st.markdown("Explore l'app avec un profil fictif diversifié ~200 000 € sur un an !")
+            st.markdown(f"👀 Active la démo depuis le menu de gauche")
+
+    else:
+        categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
+
+        for categorie in categories_presentes:
+            category_color = CATEGORY_COLOR_MAP.get(categorie, "#CCCCCC")
+            st.markdown(
+                f"<span style='color:{category_color}; font-size:0.85em;'>●</span> "
+                f"<span style='color:{category_color}; font-size:0.85em; text-transform:uppercase; letter-spacing:0.08em;'>{categorie}</span>",
+                unsafe_allow_html=True,
+            )
+            df_cat = df[df["categorie"] == categorie]
+            for _, row in df_cat.iterrows():
+                with st.container(border=True, vertical_alignment="center"):
+                    _render_asset_row(row)
+            st.space(size="small")
 
     return df

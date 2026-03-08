@@ -12,10 +12,9 @@ Point d'entrée unique : render(df)
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 from services.assets import compute_by_category, compute_total
 from services.db import get_total_emprunts, load_emprunts
-from constants import CATEGORY_COLOR_MAP, PLOTLY_LAYOUT
+from constants import CATEGORY_COLOR_MAP, CATEGORIES_AUTO, PLOTLY_LAYOUT
 
 
 # ── Métriques clés ────────────────────────────────────────────────────────────
@@ -37,7 +36,7 @@ def _render_kpis(df: pd.DataFrame):
     )
 
 
-# ── Répartition actifs par catégorie ─────────────────────────────────────────
+# ── Répartition actifs par catégorie (cartes) ────────────────────────────────
 
 def _render_repartition_actifs(df: pd.DataFrame):
     stats = compute_by_category(df)
@@ -46,31 +45,73 @@ def _render_repartition_actifs(df: pd.DataFrame):
 
     st.subheader("Actifs par catégorie", anchor=False)
 
-    with st.container(horizontal=True):
-        for _, row in stats.iterrows():
-            st.metric(
-                label=row["categorie"],
-                value=f"{row['montant']:,.2f} €",
-                border=True,
-                delta=f"{row['pourcentage']:.1f}%",
-                delta_color="off",
-                delta_arrow="off",
+    # Calcul du PnL par catégorie (uniquement pour les catégories auto)
+    pnl_by_cat: dict[str, float] = {}
+    for categorie in CATEGORIES_AUTO:
+        df_cat = df[df["categorie"] == categorie]
+        if df_cat.empty:
+            continue
+        valeur_actuelle = df_cat["montant"].sum()
+        valeur_achat = (df_cat["pru"] * df_cat["quantite"]).sum()
+        if valeur_achat > 0:
+            pnl_by_cat[categorie] = valeur_actuelle - valeur_achat
+
+    # En-tête de la liste
+    header_cols = st.columns([3, 1.5, 2, 2])
+    header_cols[0].caption("Catégorie")
+    header_cols[1].caption("Répartition")
+    header_cols[2].caption("Valeur")
+    header_cols[3].caption("Plus/moins-value")
+
+    for _, row in stats.iterrows():
+        categorie = row["categorie"]
+        color = CATEGORY_COLOR_MAP.get(categorie, "#CCCCCC")
+        pnl = pnl_by_cat.get(categorie)
+
+        with st.container(border=True):
+            cols = st.columns([3, 1.5, 2, 2])
+
+            # Nom coloré
+            cols[0].markdown(
+                f"<span style='color:{color}; font-size:0.85em;'>●</span> "
+                f"<span style='color:{color}; font-size:0.85em; text-transform:uppercase; "
+                f"letter-spacing:0.08em;'>{categorie}</span>",
+                unsafe_allow_html=True,
             )
 
-    fig = go.Figure(go.Pie(
-        labels=stats["categorie"],
-        values=stats["montant"],
-        marker=dict(colors=[CATEGORY_COLOR_MAP.get(cat, "#CCCCCC") for cat in stats["categorie"]]),
-        textinfo="label+percent",
-        textfont=dict(color="#E8EAF0", size=13),
-        hole=0.35,
-    ))
-    fig.update_layout(
-        **{**PLOTLY_LAYOUT, "margin": dict(l=10, r=10, t=10, b=10)},
-        showlegend=False,
-    )
-    st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
+            # Répartition %
+            cols[1].write(f"{row['pourcentage']:.1f} %")
 
+            # Valeur
+            cols[2].write(f"{row['montant']:,.2f} €")
+
+            # PnL (uniquement si disponible)
+            if pnl is not None:
+                sign = "+" if pnl >= 0 else ""
+                badge_color = "green" if pnl >= 0 else "red"
+                icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
+                cols[3].markdown(f":{badge_color}-badge[{icon} {sign}{pnl:,.2f} €]")
+            else:
+                cols[3].caption("—")
+
+
+# ── Répartition par enveloppe fiscale ────────────────────────────────────────
+
+def _render_enveloppes(df: pd.DataFrame):
+    df_env = df[df["enveloppe"].notna() & (df["enveloppe"].str.strip() != "")]
+    if df_env.empty:
+        return
+
+    totaux = (
+        df_env.groupby("enveloppe")["montant"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    st.subheader("Actifs par enveloppe", anchor=False)
+    with st.container(horizontal=True):
+        for enveloppe, montant in totaux.items():
+            st.metric(label=enveloppe, value=f"{montant:,.2f} €", border=True)
 
 
 # ── Résumé des passifs ────────────────────────────────────────────────────────
@@ -107,6 +148,8 @@ def render(df: pd.DataFrame):
     st.divider()
     _render_repartition_actifs(df)
 
+    st.divider()
+    _render_enveloppes(df)
 
     df_emprunts = load_emprunts()
     if not df_emprunts.empty:
