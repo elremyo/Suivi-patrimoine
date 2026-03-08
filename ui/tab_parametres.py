@@ -18,7 +18,7 @@ def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
     
     # ── Ajout d'un nouveau contrat ───────────────────────────────────────────
     with st.expander("Ajouter un contrat", expanded=False, icon=":material/add:"):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns([4, 4, 1.5], vertical_alignment="bottom")
         with col1:
             etablissement = st.text_input(
                 "Établissement *",
@@ -32,15 +32,15 @@ def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
                 options=sorted(ENVELOPPES),
                 key="new_contrat_enveloppe"
             )
-        
-        if st.button("Créer le contrat", type="primary", key="btn_add_contrat"):
-            if etablissement and enveloppe:
-                ok, msg, contrat_id = add_contrat(etablissement, enveloppe)
-                st.toast(msg, icon="✅" if ok else "⚠️")
-                if ok:
-                    st.rerun()
-            else:
-                st.toast("L'établissement et l'enveloppe sont obligatoires.", icon="⚠️")
+        with col3:
+            if st.button("Créer le contrat", type="primary", key="btn_add_contrat"):
+                if etablissement and enveloppe:
+                    ok, msg, contrat_id = add_contrat(etablissement, enveloppe)
+                    st.toast(msg, icon="✅" if ok else "⚠️")
+                    if ok:
+                        st.rerun()
+                else:
+                    st.toast("L'établissement et l'enveloppe sont obligatoires.", icon="⚠️")
     
     # ── Liste des contrats existants ───────────────────────────────────────────
     df_contrats = load_contrats()
@@ -65,12 +65,12 @@ def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
             and (df_assets['contrat_id'].astype(str) == contrat_id).any()
         )
         
-        with st.container(border=True):
+        with st.container(border=True, vertical_alignment="center"):
             if editing == contrat_id:
                 # ── Mode édition inline ────────────────────────────────────────
-                with st.container(border=True):
+                with st.container(border=False, vertical_alignment="center"):
                     st.markdown("**Modifier le contrat**")
-                    col1, col2, col3, col4 = st.columns([4, 4, 1, 1], vertical_alignment="center")
+                    col1, col2, col3, col4 = st.columns([5, 5, 0.9, 0.9], vertical_alignment="bottom")
                     with col1:
                         new_etablissement = st.text_input(
                             "Établissement",
