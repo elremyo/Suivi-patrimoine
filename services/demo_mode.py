@@ -2,22 +2,24 @@
 services/demo_mode.py
 ──────────────────────
 Gestion du mode démo : activation, désactivation, reset complet.
+Fonctionne avec SQLite : on copie/restaure patrimoine.db entier.
 """
 
 import os
 import shutil
-import pandas as pd
 from constants import DEMO_USER_NAME
 
 _ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATA_DIR   = os.path.join(_ROOT, "data")
 BACKUP_DIR = os.path.join(DATA_DIR, "data_backup")
-DEMO_DIR   = os.path.join(DATA_DIR, "donnees_fictives")
+DEMO_DB    = os.path.join(DATA_DIR, "donnees_fictives", "patrimoine.db")
+LIVE_DB    = os.path.join(DATA_DIR, "patrimoine.db")
+BACKUP_DB  = os.path.join(BACKUP_DIR, "patrimoine.db")
 MODE_FILE  = os.path.join(DATA_DIR, ".mode")
 
-FICHIERS = ["patrimoine.csv", "historique.csv", "positions.csv","referentiel.csv"]
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def is_demo_mode() -> bool:
     try:
@@ -27,43 +29,42 @@ def is_demo_mode() -> bool:
 
 
 def has_backup() -> bool:
-    return os.path.exists(BACKUP_DIR) and any(
-        os.path.exists(os.path.join(BACKUP_DIR, f)) for f in FICHIERS
-    )
+    return os.path.exists(BACKUP_DB)
 
 
 def has_personal_data() -> bool:
     """Retourne True si l'utilisateur a au moins un actif dans ses données."""
-    path = os.path.join(DATA_DIR, "patrimoine.csv")
+    if not os.path.exists(LIVE_DB):
+        return False
     try:
-        df = pd.read_csv(path)
-        return not df.empty
+        import sqlite3
+        conn = sqlite3.connect(LIVE_DB)
+        count = conn.execute("SELECT COUNT(*) FROM actifs").fetchone()[0]
+        conn.close()
+        return count > 0
     except Exception:
         return False
 
 
+# ── Actions ───────────────────────────────────────────────────────────────────
+
 def activate_demo() -> str:
     """
     Active le mode démo :
-    - Sauvegarde les données perso dans data/data_backup/ si elles existent
-    - Copie les données fictives dans data/
+    - Sauvegarde patrimoine.db dans data_backup/ si des données perso existent
+    - Copie la base de démo à la place
     - Écrit le marqueur .mode = demo
     """
     os.makedirs(DATA_DIR, exist_ok=True)
 
     if has_personal_data():
         os.makedirs(BACKUP_DIR, exist_ok=True)
-        for f in FICHIERS:
-            src = os.path.join(DATA_DIR, f)
-            dst = os.path.join(BACKUP_DIR, f)
-            if os.path.exists(src):
-                shutil.copy2(src, dst)
+        shutil.copy2(LIVE_DB, BACKUP_DB)
 
-    for f in FICHIERS:
-        src = os.path.join(DEMO_DIR, f)
-        dst = os.path.join(DATA_DIR, f)
-        if os.path.exists(src):
-            shutil.copy2(src, dst)
+    if not os.path.exists(DEMO_DB):
+        return "Erreur : base de démo introuvable. Lance scripts/generate_demo_db.py d'abord."
+
+    shutil.copy2(DEMO_DB, LIVE_DB)
 
     with open(MODE_FILE, "w") as fp:
         fp.write("demo")
@@ -72,29 +73,21 @@ def activate_demo() -> str:
 
 
 def deactivate_demo() -> str:
-    print("BACKUP_DIR:", BACKUP_DIR)
-    print("BACKUP_DIR exists:", os.path.exists(BACKUP_DIR))
-    print("has_backup():", has_backup())
-    for f in FICHIERS:
-        p = os.path.join(BACKUP_DIR, f)
-        print(f, "→", os.path.exists(p))
-
+    """
+    Désactive le mode démo :
+    - Restaure patrimoine.db depuis data_backup/ si un backup existe
+    - Sinon, supprime patrimoine.db (retour à état vide)
+    - Écrit le marqueur .mode = perso
+    """
     if has_backup():
-        for f in FICHIERS:
-            src = os.path.join(BACKUP_DIR, f)
-            dst = os.path.join(DATA_DIR, f)
-            if os.path.exists(src):
-                shutil.copy2(src, dst)
+        shutil.copy2(BACKUP_DB, LIVE_DB)
         shutil.rmtree(BACKUP_DIR, ignore_errors=True)
         msg = "Vos données personnelles ont été restaurées."
     else:
-        for f in FICHIERS:
-            path = os.path.join(DATA_DIR, f)
-            if os.path.exists(path):
-                os.remove(path)
+        if os.path.exists(LIVE_DB):
+            os.remove(LIVE_DB)
         msg = "Mode démo désactivé."
 
-    # Toujours écrire "perso" — même sans backup
     with open(MODE_FILE, "w") as fp:
         fp.write("perso")
 
@@ -103,14 +96,12 @@ def deactivate_demo() -> str:
 
 def reset_all_data() -> str:
     """
-    Supprime toutes les données (data/ + backup).
+    Supprime toutes les données (base live + backup).
     """
     shutil.rmtree(BACKUP_DIR, ignore_errors=True)
 
-    for f in FICHIERS:
-        path = os.path.join(DATA_DIR, f)
-        if os.path.exists(path):
-            os.remove(path)
+    if os.path.exists(LIVE_DB):
+        os.remove(LIVE_DB)
 
     with open(MODE_FILE, "w") as fp:
         fp.write("perso")

@@ -2,9 +2,15 @@
 venv/
 .env/
 
-# Données locales (CRITIQUE)
-data/*
-!data/.gitkeep
+# Données locales (CRITIQUE — jamais versionner les données perso)
+data/patrimoine.db
+data/data_backup/
+data/.mode
+data/backup_perso/
+
+# Données fictives : on garde le .db de démo et les éventuels CSV sources
+!data/donnees_fictives/
+!data/donnees_fictives/**
 
 # Python
 __pycache__/
