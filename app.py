@@ -11,10 +11,10 @@ from services.assets import get_assets
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
 from services.positions import init_positions, load_positions
 from services.referentiel import init_referentiel
+from ui.tab_synthese import render as render_synthese
 from ui.tab_actifs import render as render_actifs
 from ui.tab_emprunts import render as render_emprunts
 from ui.tab_historique import render as render_historique
-from ui.tab_repartition import render as render_repartition
 from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog
 from ui.emprunt_form import render_emprunt_dialog
@@ -30,7 +30,7 @@ init_historique()
 init_positions()
 
 
-# ── Cache des lectures CSV ────────────────────────────────────────────────────
+# ── Cache des lectures ────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False)
 def cached_load_assets() -> pd.DataFrame:
@@ -56,7 +56,6 @@ df           = cached_load_assets()
 df_hist      = cached_load_historique()
 df_positions = cached_load_positions()
 
-# Init du référentiel courtiers/enveloppes (pré-remplit depuis les actifs existants)
 init_referentiel(df)
 
 
@@ -94,18 +93,18 @@ st.title("Suivi de patrimoine", anchor=False)
 if is_demo_mode():
     st.info("Mode démo. Pour le quitter, utilise le menu de gauche.", icon="👀")
 
-tab_actifs, tab_emprunts, tab_repartition, tab_historique, tab_params = st.tabs([
-    "Actifs", "Emprunts", "Répartition", "Historique", "Paramètres"
+tab_synthese, tab_actifs, tab_passifs, tab_historique, tab_params = st.tabs([
+    "Synthèse", "Actifs", "Passifs", "Historique", "Paramètres"
 ])
+
+with tab_synthese:
+    render_synthese(df)
 
 with tab_actifs:
     render_actifs(df, invalidate_data_cache, flash)
 
-with tab_emprunts:
+with tab_passifs:
     render_emprunts(flash)
-
-with tab_repartition:
-    render_repartition(df)
 
 with tab_historique:
     render_historique(df, df_hist, df_positions)
