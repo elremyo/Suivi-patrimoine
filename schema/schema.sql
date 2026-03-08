@@ -2,6 +2,18 @@
 -- Exécutable avec: sqlite3 data/patrimoine.db < schema/schema.sql
 
 -- =============================================================================
+-- CONTRATS (établissement + enveloppe)
+-- Un contrat = un établissement (ex. Degiro) + un type d'enveloppe (ex. PEA)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS contrats (
+  id TEXT PRIMARY KEY,
+  etablissement TEXT NOT NULL,
+  enveloppe TEXT NOT NULL,
+  UNIQUE(etablissement, enveloppe)
+);
+
+
+-- =============================================================================
 -- ACTIFS (table centrale)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS actifs (
@@ -11,11 +23,13 @@ CREATE TABLE IF NOT EXISTS actifs (
   montant_actuel REAL NOT NULL DEFAULT 0,
   courtier TEXT,
   enveloppe TEXT,
+  contrat_id TEXT REFERENCES contrats(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_actifs_type ON actifs(type);
+CREATE INDEX IF NOT EXISTS idx_actifs_contrat ON actifs(contrat_id);
 
 
 -- =============================================================================
@@ -91,7 +105,8 @@ CREATE INDEX IF NOT EXISTS idx_positions_asset ON positions(asset_id);
 
 
 -- =============================================================================
--- Référentiel (courtiers / enveloppes)
+-- Référentiel (courtiers / enveloppes) — sera remplacé par contrats
+-- Conservé temporairement pour la migration
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS referentiel (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

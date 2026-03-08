@@ -9,14 +9,14 @@ def get_assets() -> pd.DataFrame:
 
 def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
               ticker: str = "", quantite: float = 0.0, pru: float = 0.0,
-              courtier: str = "", enveloppe: str = "") -> pd.DataFrame:
+              contrat_id: str = "") -> pd.DataFrame:
     # Pour les actifs auto, le montant initial = PRU × quantité en attendant le premier refresh
     if ticker and quantite > 0 and pru > 0:
         montant = round(pru * quantite, 2)
     asset_id = str(uuid.uuid4())
-    # Toujours 9 colonnes de base ; le df peut en avoir plus (détail immobilier) → concat aligne
+    # Toujours 8 colonnes de base ; le df peut en avoir plus (détail immobilier) → concat aligne
     new_row = pd.DataFrame(
-        [[asset_id, nom, categorie, montant, ticker, quantite, pru, courtier, enveloppe]],
+        [[asset_id, nom, categorie, montant, ticker, quantite, pru, contrat_id]],
         columns=COLUMNS,
     )
     if df.empty:
@@ -28,15 +28,14 @@ def add_asset(df: pd.DataFrame, nom: str, categorie: str, montant: float,
 
 def update_asset(df: pd.DataFrame, idx: int, nom: str, categorie: str, montant: float,
                  ticker: str = "", quantite: float = 0.0, pru: float = 0.0,
-                 courtier: str = "", enveloppe: str = "") -> pd.DataFrame:
+                 contrat_id: str = "") -> pd.DataFrame:
     df.loc[idx, "nom"] = nom
     df.loc[idx, "categorie"] = categorie
     df.loc[idx, "montant"] = montant
     df.loc[idx, "ticker"] = ticker
     df.loc[idx, "quantite"] = quantite
     df.loc[idx, "pru"] = pru
-    df.loc[idx, "courtier"] = courtier
-    df.loc[idx, "enveloppe"] = enveloppe
+    df.loc[idx, "contrat_id"] = contrat_id
     return df
 
 

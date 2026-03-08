@@ -65,6 +65,86 @@ def _find_row_by_id(df: pd.DataFrame, asset_id: str):
     return matches.index[0], matches.iloc[0]
 
 
+def _contrat_fields(row=None):
+    """
+    Affiche le champ Contrat sous forme de liste déroulante.
+    Un contrat = un établissement + une enveloppe (ex: "Boursorama — PEA").
+    Si l'utilisateur choisit "+ Nouveau contrat...", des champs apparaissent
+    pour créer un nouveau contrat.
+    """
+    from services.db import load_contrats, get_or_create_contrat
+    
+    initial_contrat_id = str(row.get("contrat_id", "") or "").strip() if row is not None else ""
+    
+    NOUVEAU_CONTRAT = "+ Nouveau contrat..."
+    
+    # ── Charger les contrats existants ───────────────────────────────────────
+    df_contrats = load_contrats()
+    contrat_options = []
+    contrat_id_to_display = {}
+    
+    for _, contrat_row in df_contrats.iterrows():
+        display = f"{contrat_row['etablissement']} — {contrat_row['enveloppe']}"
+        contrat_options.append(display)
+        contrat_id_to_display[display] = contrat_row['id']
+    
+    # Ajouter l'option nouveau contrat
+    contrat_options.append(NOUVEAU_CONTRAT)
+    
+    # Trouver l'affichage correspondant au contrat_id initial
+    default_display = NOUVEAU_CONTRAT
+    if initial_contrat_id:
+        for display, cid in contrat_id_to_display.items():
+            if cid == initial_contrat_id:
+                default_display = display
+                break
+    
+    default_idx = contrat_options.index(default_display) if default_display in contrat_options else len(contrat_options) - 1
+    
+    # ── Sélection du contrat ─────────────────────────────────────────────────
+    contrat_selection = st.selectbox(
+        "Contrat *",
+        options=contrat_options,
+        index=default_idx,
+        key="_form_contrat_select",
+        help="Établissement + enveloppe (ex: Boursorama — PEA)"
+    )
+    
+    contrat_id = None
+    if contrat_selection == NOUVEAU_CONTRAT:
+        # ── Création d'un nouveau contrat ───────────────────────────────────
+        st.markdown("**Nouveau contrat**")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            etablissement = st.text_input(
+                "Établissement *",
+                placeholder="ex. Boursorama, Degiro, Crédit Agricole",
+                key="_form_etablissement_new"
+            ).strip()
+        
+        with col2:
+            from constants import ENVELOPPES
+            enveloppe = st.selectbox(
+                "Enveloppe *",
+                options=sorted(ENVELOPPES),
+                key="_form_enveloppe_new"
+            )
+        
+        # Stocker les infos du nouveau contrat pour la création lors de la sauvegarde
+        st.session_state["_new_contrat"] = {
+            "etablissement": etablissement,
+            "enveloppe": enveloppe
+        }
+    else:
+        # Contrat existant
+        contrat_id = contrat_id_to_display[contrat_selection]
+        # Nettoyer le nouveau contrat potentiellement précédent
+        st.session_state.pop("_new_contrat", None)
+    
+    return contrat_id
+
+
 def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
     """
     Affiche les champs Courtier et Enveloppe sous forme de listes déroulantes
@@ -203,7 +283,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
-    courtier, enveloppe = _courtier_enveloppe_fields(row if mode == "edit" else None)
+    contrat_id = _contrat_fields(row if mode == "edit" else None)
 
     c1, c2 = st.columns(2)
     if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
@@ -211,16 +291,26 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         st.rerun()
 
     if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
-        if not courtier:
-            st.warning("Le courtier / la banque est obligatoire.")
+        # Gérer la création du contrat si nécessaire
+        final_contrat_id = contrat_id
+        if contrat_id is None and "_new_contrat" in st.session_state:
+            new_contrat = st.session_state["_new_contrat"]
+            if new_contrat["etablissement"] and new_contrat["enveloppe"]:
+                from services.db import get_or_create_contrat
+                final_contrat_id = get_or_create_contrat(
+                    new_contrat["etablissement"], 
+                    new_contrat["enveloppe"]
+                )
+        
+        if not final_contrat_id:
+            st.warning("Le contrat est obligatoire.")
         else:
-            _save_referentiel(courtier)
             effective_ticker = ticker_result["ticker"]
             if mode == "create":
                 with st.spinner("Ajout en cours…"):
                     df, msg, msg_type = create_auto_asset(
                         df, effective_ticker, quantite, pru, categorie,
-                        courtier=courtier, enveloppe=enveloppe,
+                        contrat_id=final_contrat_id,
                     )
             else:
                 ticker_current   = row.get("ticker", "")
@@ -231,7 +321,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
                         effective_ticker, ticker_current,
                         quantite, quantite_current,
                         pru, categorie,
-                        courtier=courtier, enveloppe=enveloppe,
+                        contrat_id=final_contrat_id,
                     )
             flash_fn(msg, msg_type)
             _close_dialog()
@@ -257,10 +347,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
-    courtier, enveloppe = _courtier_enveloppe_fields(
-        row if mode == "edit" else None,
-        show_enveloppe=(categorie != "Immobilier"),
-    )
+    contrat_id = _contrat_fields(row if mode == "edit" else None)
 
     immo_params = None
     if categorie == "Immobilier":
@@ -327,22 +414,32 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         st.rerun()
 
     if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
+        # Gérer la création du contrat si nécessaire
+        final_contrat_id = contrat_id
+        if contrat_id is None and "_new_contrat" in st.session_state:
+            new_contrat = st.session_state["_new_contrat"]
+            if new_contrat["etablissement"] and new_contrat["enveloppe"]:
+                from services.db import get_or_create_contrat
+                final_contrat_id = get_or_create_contrat(
+                    new_contrat["etablissement"], 
+                    new_contrat["enveloppe"]
+                )
+        
         if not nom:
             st.warning("Le nom est obligatoire.")
-        elif not courtier:
-            st.warning("Le courtier / la banque est obligatoire.")
+        elif not final_contrat_id:
+            st.warning("Le contrat est obligatoire.")
         else:
-            _save_referentiel(courtier)
             if mode == "create":
                 df, msg, msg_type = create_manual_asset(
                     df, nom, categorie, montant,
-                    courtier=courtier, enveloppe=enveloppe,
+                    contrat_id=final_contrat_id,
                     immo_params=immo_params,
                 )
             else:
                 df, msg, msg_type = edit_manual_asset(
                     df, idx, row["id"], nom, categorie, montant,
-                    courtier=courtier, enveloppe=enveloppe,
+                    contrat_id=final_contrat_id,
                     immo_params=immo_params,
                 )
             flash_fn(msg, msg_type)

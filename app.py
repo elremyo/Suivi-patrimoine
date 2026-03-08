@@ -29,7 +29,6 @@ init_storage()
 init_historique()
 init_positions()
 
-
 # ── Cache des lectures ────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False)

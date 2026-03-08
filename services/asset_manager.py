@@ -28,8 +28,7 @@ def create_auto_asset(
     quantite: float,
     pru: float,
     categorie: str,
-    courtier: str = "",
-    enveloppe: str = "",
+    contrat_id: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
     valid, err = validate_ticker(ticker)
     if not valid:
@@ -37,7 +36,7 @@ def create_auto_asset(
 
     nom = get_name(ticker)
     df = add_asset(df, nom, categorie, montant=0.0, ticker=ticker, quantite=quantite, pru=pru,
-                   courtier=courtier, enveloppe=enveloppe)
+                   contrat_id=contrat_id)
     asset_id = df.iloc[-1]["id"]
     record_position(asset_id, quantite)
     df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
@@ -53,11 +52,10 @@ def create_manual_asset(
     nom: str,
     categorie: str,
     montant: float,
-    courtier: str = "",
-    enveloppe: str = "",
+    contrat_id: str = "",
     immo_params: dict | None = None,
 ) -> tuple[pd.DataFrame, str, str]:
-    df = add_asset(df, nom, categorie, montant, courtier=courtier, enveloppe=enveloppe)
+    df = add_asset(df, nom, categorie, montant, contrat_id=contrat_id)
     if categorie == "Immobilier" and immo_params:
         last_idx = df.index[-1]
         for k, v in immo_params.items():
@@ -81,8 +79,7 @@ def edit_auto_asset(
     quantite_current: float,
     pru: float,
     categorie: str,
-    courtier: str = "",
-    enveloppe: str = "",
+    contrat_id: str = "",
 ) -> tuple[pd.DataFrame, str, str]:
     valid, err = validate_ticker(ticker)
     if not valid:
@@ -92,7 +89,7 @@ def edit_auto_asset(
     montant = float(df.loc[idx, "montant"])
 
     df = update_asset(df, idx, nom, categorie, montant, ticker, quantite, pru,
-                      courtier=courtier, enveloppe=enveloppe)
+                      contrat_id=contrat_id)
     if quantite != quantite_current:
         record_position(asset_id, quantite)
     df, errors = refresh_auto_assets(df, CATEGORIES_AUTO)
@@ -110,14 +107,13 @@ def edit_manual_asset(
     nom: str,
     categorie: str,
     montant: float,
-    courtier: str = "",
-    enveloppe: str = "",
+    contrat_id: str = "",
     immo_params: dict | None = None,
 ) -> tuple[pd.DataFrame, str, str]:
     montant_actuel = float(df.loc[idx, "montant"])
 
     df = update_asset(df, idx, nom, categorie, montant,
-                      courtier=courtier, enveloppe=enveloppe)
+                      contrat_id=contrat_id)
     if categorie == "Immobilier" and immo_params:
         for k, v in immo_params.items():
             df.loc[idx, k] = v

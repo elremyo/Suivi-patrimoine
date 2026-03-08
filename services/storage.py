@@ -3,7 +3,7 @@ import pandas as pd
 
 from services import db
 
-COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
+COLUMNS = ["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "contrat_id"]
 HISTORIQUE_COLUMNS = ["asset_id", "date", "montant"]
 POSITIONS_COLUMNS = ["asset_id", "date", "quantite"]
 

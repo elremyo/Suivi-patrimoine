@@ -2,8 +2,6 @@
 db.py
 ─────
 Couche d'accès SQLite pour le suivi de patrimoine.
-Expose les mêmes concepts que le stockage CSV (actifs, historique, positions, référentiel)
-avec un schéma normalisé (actifs, actifs_ticker, actifs_immobilier, emprunts, etc.).
 """
 
 import os
@@ -26,12 +24,10 @@ CATEGORY_TO_TYPE = {
 }
 TYPE_TO_CATEGORY = {v: k for k, v in CATEGORY_TO_TYPE.items()}
 
-# Colonnes attendues pour compatibilité avec le reste de l'app (flat DataFrame)
 ASSETS_FLAT_COLUMNS = [
     "id", "nom", "categorie", "montant", "ticker", "quantite", "pru",
-    "courtier", "enveloppe",
+    "courtier", "enveloppe", "contrat_id",
 ]
-# Colonnes optionnelles pour immobilier (si présentes dans le df)
 IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2"]
 
 
@@ -44,7 +40,8 @@ def get_conn() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Crée le fichier DB et les tables s'ils n'existent pas."""
+    """Crée le fichier DB et les tables s'ils n'existent pas.
+    Applique aussi les migrations nécessaires sur une base existante."""
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     schema_path = _schema_path()
     if not os.path.exists(schema_path):
@@ -55,6 +52,124 @@ def init_db() -> None:
     try:
         conn.executescript(sql)
         conn.commit()
+        _migrate(conn)
+    finally:
+        conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Applique les migrations incrémentales sur une base existante."""
+    # Ajout de contrat_id dans actifs si absent (base existante avant cette feature)
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(actifs)").fetchall()]
+    if "contrat_id" not in cols:
+        conn.execute("ALTER TABLE actifs ADD COLUMN contrat_id TEXT REFERENCES contrats(id) ON DELETE SET NULL")
+        conn.commit()
+
+
+# ── Contrats ──────────────────────────────────────────────────────────────────
+
+def load_contrats() -> pd.DataFrame:
+    """Retourne tous les contrats avec colonnes : id, etablissement, enveloppe."""
+    conn = get_conn()
+    try:
+        df = pd.read_sql_query(
+            "SELECT id, etablissement, enveloppe FROM contrats ORDER BY etablissement, enveloppe",
+            conn,
+        )
+        return df
+    finally:
+        conn.close()
+
+
+def get_or_create_contrat(etablissement: str, enveloppe: str) -> str:
+    """
+    Retourne l'id du contrat correspondant à (etablissement, enveloppe).
+    Le crée s'il n'existe pas encore.
+    """
+    etablissement = etablissement.strip()
+    enveloppe = enveloppe.strip()
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT id FROM contrats WHERE etablissement = ? AND enveloppe = ?",
+            (etablissement, enveloppe),
+        ).fetchone()
+        if row:
+            return row[0]
+        contrat_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO contrats (id, etablissement, enveloppe) VALUES (?, ?, ?)",
+            (contrat_id, etablissement, enveloppe),
+        )
+        conn.commit()
+        return contrat_id
+    finally:
+        conn.close()
+
+
+def add_contrat(etablissement: str, enveloppe: str) -> tuple[bool, str, str | None]:
+    """
+    Crée un nouveau contrat. Retourne (succès, message, contrat_id).
+    Échoue si le couple (etablissement, enveloppe) existe déjà.
+    """
+    etablissement = etablissement.strip()
+    enveloppe = enveloppe.strip()
+    if not etablissement or not enveloppe:
+        return False, "L'établissement et l'enveloppe sont obligatoires.", None
+    conn = get_conn()
+    try:
+        contrat_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO contrats (id, etablissement, enveloppe) VALUES (?, ?, ?)",
+            (contrat_id, etablissement, enveloppe),
+        )
+        conn.commit()
+        return True, f"Contrat « {etablissement} — {enveloppe} » ajouté.", contrat_id
+    except sqlite3.IntegrityError:
+        return False, f"« {etablissement} — {enveloppe} » existe déjà.", None
+    finally:
+        conn.close()
+
+
+def update_contrat(contrat_id: str, etablissement: str, enveloppe: str) -> tuple[bool, str]:
+    """Met à jour un contrat existant."""
+    etablissement = etablissement.strip()
+    enveloppe = enveloppe.strip()
+    if not etablissement or not enveloppe:
+        return False, "L'établissement et l'enveloppe sont obligatoires."
+    conn = get_conn()
+    try:
+        # Vérifier unicité sur les autres contrats
+        row = conn.execute(
+            "SELECT id FROM contrats WHERE etablissement = ? AND enveloppe = ? AND id != ?",
+            (etablissement, enveloppe, contrat_id),
+        ).fetchone()
+        if row:
+            return False, f"« {etablissement} — {enveloppe} » existe déjà."
+        conn.execute(
+            "UPDATE contrats SET etablissement = ?, enveloppe = ? WHERE id = ?",
+            (etablissement, enveloppe, contrat_id),
+        )
+        conn.commit()
+        return True, f"Contrat mis à jour : « {etablissement} — {enveloppe} »."
+    finally:
+        conn.close()
+
+
+def delete_contrat(contrat_id: str) -> tuple[bool, str]:
+    """
+    Supprime un contrat seulement s'il n'est utilisé par aucun actif.
+    """
+    conn = get_conn()
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM actifs WHERE contrat_id = ?", (contrat_id,)
+        ).fetchone()[0]
+        if count > 0:
+            return False, f"Ce contrat est utilisé par {count} actif(s) — modifie-les d'abord."
+        conn.execute("DELETE FROM contrats WHERE id = ?", (contrat_id,))
+        conn.commit()
+        return True, "Contrat supprimé."
     finally:
         conn.close()
 
@@ -63,15 +178,15 @@ def init_db() -> None:
 
 def load_assets() -> pd.DataFrame:
     """
-    Retourne un DataFrame plat compatible avec l'existant :
-    id, nom, categorie, montant, ticker, quantite, pru, courtier, enveloppe.
-    Pour l'immobilier, ajoute les colonnes prix_achat, type_bien, adresse, superficie_m2, emprunt_id si présentes en base.
+    Retourne un DataFrame plat : id, nom, categorie, montant, ticker, quantite, pru,
+    courtier, enveloppe, contrat_id.
+    Pour l'immobilier, ajoute prix_achat, type_bien, adresse, superficie_m2, emprunt_id.
     """
     conn = get_conn()
     try:
-        # actifs + actifs_ticker (LEFT JOIN pour avoir ticker/quantite/pru pour action/crypto)
         q = """
         SELECT a.id, a.type, a.nom, a.montant_actuel, a.courtier, a.enveloppe,
+               a.contrat_id,
                COALESCE(t.ticker, '') AS ticker,
                COALESCE(t.quantite, 0) AS quantite,
                COALESCE(t.pru, 0) AS pru
@@ -81,7 +196,6 @@ def load_assets() -> pd.DataFrame:
         """
         df = pd.read_sql_query(q, conn)
 
-        # Détail immobilier
         q_immo = "SELECT actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2 FROM actifs_immobilier"
         try:
             df_immo = pd.read_sql_query(q_immo, conn)
@@ -95,16 +209,10 @@ def load_assets() -> pd.DataFrame:
 
     df["categorie"] = df["type"].map(TYPE_TO_CATEGORY)
     df["montant"] = df["montant_actuel"]
-    df = df[["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]]
+    df = df[["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe", "contrat_id"]]
 
     if not df_immo.empty and not df.empty:
-        df = df.merge(
-            df_immo,
-            left_on="id",
-            right_on="actif_id",
-            how="left",
-            suffixes=("", "_immo"),
-        )
+        df = df.merge(df_immo, left_on="id", right_on="actif_id", how="left", suffixes=("", "_immo"))
         if "actif_id" in df.columns:
             df = df.drop(columns=["actif_id"])
         for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id"]:
@@ -115,10 +223,7 @@ def load_assets() -> pd.DataFrame:
 
 
 def save_assets(df: pd.DataFrame) -> None:
-    """
-    Persiste le DataFrame plat dans les tables actifs, actifs_ticker, actifs_immobilier.
-    Utilise categorie -> type pour le type en base.
-    """
+    """Persiste le DataFrame plat dans les tables actifs, actifs_ticker, actifs_immobilier."""
     if df.empty:
         conn = get_conn()
         try:
@@ -133,35 +238,35 @@ def save_assets(df: pd.DataFrame) -> None:
     conn = get_conn()
     try:
         ids_in_df = set(df["id"].astype(str))
-        # Supprimer les actifs qui ne sont plus dans le df
         cur = conn.execute("SELECT id FROM actifs")
         existing_ids = {row[0] for row in cur.fetchall()}
-        to_delete = existing_ids - ids_in_df
-        for aid in to_delete:
+        for aid in existing_ids - ids_in_df:
             conn.execute("DELETE FROM actifs WHERE id = ?", (aid,))
 
         for _, row in df.iterrows():
             aid = str(row["id"])
-            categorie = str(row["categorie"])
-            type_ = CATEGORY_TO_TYPE.get(categorie, "livret")
+            type_ = CATEGORY_TO_TYPE.get(str(row["categorie"]), "livret")
             nom = str(row["nom"])
             montant = float(row["montant"])
             courtier = str(row.get("courtier", "") or "")
             enveloppe = str(row.get("enveloppe", "") or "")
+            contrat_id = row.get("contrat_id")
+            contrat_id = None if (contrat_id is None or (isinstance(contrat_id, float) and pd.isna(contrat_id)) or contrat_id == "") else str(contrat_id)
 
             conn.execute(
                 """
-                INSERT INTO actifs (id, type, nom, montant_actuel, courtier, enveloppe, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                INSERT INTO actifs (id, type, nom, montant_actuel, courtier, enveloppe, contrat_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 ON CONFLICT(id) DO UPDATE SET
                     type = excluded.type,
                     nom = excluded.nom,
                     montant_actuel = excluded.montant_actuel,
                     courtier = excluded.courtier,
                     enveloppe = excluded.enveloppe,
+                    contrat_id = excluded.contrat_id,
                     updated_at = datetime('now')
                 """,
-                (aid, type_, nom, montant, courtier, enveloppe),
+                (aid, type_, nom, montant, courtier, enveloppe, contrat_id),
             )
 
             if type_ in ("action", "crypto"):
@@ -214,19 +319,16 @@ def save_assets(df: pd.DataFrame) -> None:
 
 
 def get_assets_by_type(asset_type: str) -> pd.DataFrame:
-    """Retourne les lignes actifs pour un type donné (type SQLite : action, crypto, livret, immobilier, fonds_euro)."""
     df = load_assets()
     type_to_cat = TYPE_TO_CATEGORY.get(asset_type, asset_type)
     return df[df["categorie"] == type_to_cat].copy()
 
 
 def get_total_by_type() -> pd.DataFrame:
-    """DataFrame avec colonnes categorie, total."""
     conn = get_conn()
     try:
         df = pd.read_sql_query(
-            "SELECT type, SUM(montant_actuel) AS total FROM actifs GROUP BY type",
-            conn,
+            "SELECT type, SUM(montant_actuel) AS total FROM actifs GROUP BY type", conn,
         )
         df["categorie"] = df["type"].map(TYPE_TO_CATEGORY)
         return df[["categorie", "total"]].rename(columns={"total": "montant"})
@@ -235,7 +337,6 @@ def get_total_by_type() -> pd.DataFrame:
 
 
 def get_total() -> float:
-    """Total tous actifs confondus."""
     conn = get_conn()
     try:
         cur = conn.execute("SELECT COALESCE(SUM(montant_actuel), 0) FROM actifs")
@@ -322,10 +423,6 @@ def _compute_capital_restant_du(
     duree_mois: int,
     as_of_date: date | None = None,
 ) -> float:
-    """
-    Calcule le capital restant dû à une date donnée (formule d'amortissement).
-    as_of_date : date de référence (défaut = aujourd'hui). Nombre de mensualités écoulées = mois entre date_debut et as_of_date.
-    """
     if as_of_date is None:
         as_of_date = date.today()
     if isinstance(date_debut, str):
@@ -338,7 +435,6 @@ def _compute_capital_restant_du(
         debut = date_debut
     if isinstance(as_of_date, pd.Timestamp):
         as_of_date = as_of_date.date()
-    # Nombre de mois écoulés depuis le début
     months_elapsed = (as_of_date.year - debut.year) * 12 + (as_of_date.month - debut.month)
     if debut.day > as_of_date.day:
         months_elapsed -= 1
@@ -347,7 +443,7 @@ def _compute_capital_restant_du(
         return 0.0
     P = float(montant_emprunte)
     M = float(mensualite)
-    r = float(taux_annuel) / 100.0 / 12.0  # taux mensuel
+    r = float(taux_annuel) / 100.0 / 12.0
     k = months_elapsed
     if abs(r) < 1e-9:
         balance = P - M * k
@@ -357,9 +453,6 @@ def _compute_capital_restant_du(
 
 
 def load_emprunts(as_of_date: date | None = None) -> pd.DataFrame:
-    """
-    Retourne tous les emprunts avec capital_restant_du calculé à la date as_of_date (défaut: aujourd'hui).
-    """
     conn = get_conn()
     try:
         df = pd.read_sql_query(
@@ -388,32 +481,16 @@ def load_emprunts(as_of_date: date | None = None) -> pd.DataFrame:
         conn.close()
 
 
-def create_emprunt(
-    nom: str,
-    montant_emprunte: float,
-    taux_annuel: float,
-    mensualite: float,
-    duree_mois: int,
-    date_debut: str,
-    date_fin: str | None = None,
-) -> str:
-    """Crée un emprunt et retourne son id. Le capital restant dû est toujours calculé à l'affichage, jamais stocké."""
+def create_emprunt(nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin=None) -> str:
     emprunt_id = str(uuid.uuid4())
     conn = get_conn()
     try:
         conn.execute(
             """INSERT INTO emprunts (id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                emprunt_id,
-                nom.strip(),
-                float(montant_emprunte),
-                float(taux_annuel),
-                float(mensualite),
-                int(duree_mois),
-                date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
-                date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d")),
-            ),
+            (emprunt_id, nom.strip(), float(montant_emprunte), float(taux_annuel), float(mensualite), int(duree_mois),
+             date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
+             date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d"))),
         )
         conn.commit()
         return emprunt_id
@@ -421,33 +498,16 @@ def create_emprunt(
         conn.close()
 
 
-def update_emprunt(
-    emprunt_id: str,
-    nom: str,
-    montant_emprunte: float,
-    taux_annuel: float,
-    mensualite: float,
-    duree_mois: int,
-    date_debut: str,
-    date_fin: str | None = None,
-) -> None:
-    """Met à jour un emprunt existant. Le capital restant dû reste calculé à l'affichage, jamais stocké."""
+def update_emprunt(emprunt_id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin=None) -> None:
     conn = get_conn()
     try:
         conn.execute(
             """UPDATE emprunts SET nom = ?, montant_emprunte = ?, taux_annuel = ?, mensualite = ?, duree_mois = ?,
-               date_debut = ?, date_fin = ?, updated_at = datetime('now')
-               WHERE id = ?""",
-            (
-                nom.strip(),
-                float(montant_emprunte),
-                float(taux_annuel),
-                float(mensualite),
-                int(duree_mois),
-                date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
-                date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d")),
-                emprunt_id,
-            ),
+               date_debut = ?, date_fin = ?, updated_at = datetime('now') WHERE id = ?""",
+            (nom.strip(), float(montant_emprunte), float(taux_annuel), float(mensualite), int(duree_mois),
+             date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
+             date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d")),
+             emprunt_id),
         )
         conn.commit()
     finally:
@@ -455,7 +515,6 @@ def update_emprunt(
 
 
 def delete_emprunt(emprunt_id: str) -> None:
-    """Supprime un emprunt. Les actifs immobiliers liés ont leur emprunt_id mis à NULL (ON DELETE SET NULL)."""
     conn = get_conn()
     try:
         conn.execute("DELETE FROM emprunts WHERE id = ?", (emprunt_id,))
@@ -465,7 +524,6 @@ def delete_emprunt(emprunt_id: str) -> None:
 
 
 def get_total_emprunts(as_of_date: date | None = None) -> float:
-    """Somme des capitaux restants dus (calculés ou en base) pour le patrimoine net."""
     df = load_emprunts(as_of_date=as_of_date)
     if df.empty:
         return 0.0
@@ -475,12 +533,10 @@ def get_total_emprunts(as_of_date: date | None = None) -> float:
 # ── Référentiel ───────────────────────────────────────────────────────────────
 
 def load_referentiel() -> pd.DataFrame:
-    """Colonnes type, valeur comme le CSV."""
     conn = get_conn()
     try:
         df = pd.read_sql_query(
-            "SELECT kind AS type, value AS valeur FROM referentiel ORDER BY kind, value",
-            conn,
+            "SELECT kind AS type, value AS valeur FROM referentiel ORDER BY kind, value", conn,
         )
         return df
     finally:
@@ -488,9 +544,7 @@ def load_referentiel() -> pd.DataFrame:
 
 
 def init_referentiel_from_assets(df_assets: pd.DataFrame | None) -> None:
-    """Pré-remplit le référentiel avec les courtiers des actifs (et enveloppes par défaut si vide)."""
     from constants import ENVELOPPES
-
     conn = get_conn()
     try:
         cur = conn.execute("SELECT COUNT(*) FROM referentiel")
@@ -530,7 +584,7 @@ def delete_courtier(value: str, df_assets: pd.DataFrame) -> tuple[bool, str]:
     if not df_assets.empty:
         used = (df_assets["courtier"].astype(str).str.strip() == value).any()
         if used:
-            return False, f"« {value} » est encore utilisé par un actif — modifie l'actif d'abord."
+            return False, f"« {value} » est encore utilisé par un actif."
     conn = get_conn()
     try:
         conn.execute("DELETE FROM referentiel WHERE kind = 'courtier' AND value = ?", (value,))
@@ -550,7 +604,7 @@ def rename_courtier(ancien: str, nouveau: str, df_assets: pd.DataFrame) -> tuple
     try:
         cur = conn.execute("SELECT 1 FROM referentiel WHERE kind = 'courtier' AND value = ?", (nouveau,))
         if cur.fetchone():
-            return False, f"« {nouveau} » existe déjà dans le référentiel.", df_assets
+            return False, f"« {nouveau} » existe déjà.", df_assets
         conn.execute("UPDATE referentiel SET value = ? WHERE kind = 'courtier' AND value = ?", (nouveau, ancien))
         conn.execute("UPDATE actifs SET courtier = ? WHERE courtier = ?", (nouveau, ancien))
         conn.commit()
@@ -567,13 +621,11 @@ def rename_courtier(ancien: str, nouveau: str, df_assets: pd.DataFrame) -> tuple
     return True, f"Courtier renommé en « {nouveau} »{detail}.", df_assets
 
 
-# ── Export / téléchargement (bytes pour l'UI) ──────────────────────────────────
+# ── Export ────────────────────────────────────────────────────────────────────
 
 def download_historique_bytes() -> bytes:
-    df = load_historique()
-    return df.to_csv(index=False).encode("utf-8")
+    return load_historique().to_csv(index=False).encode("utf-8")
 
 
 def download_positions_bytes() -> bytes:
-    df = load_positions()
-    return df.to_csv(index=False).encode("utf-8")
+    return load_positions().to_csv(index=False).encode("utf-8")
