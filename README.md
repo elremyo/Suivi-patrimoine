@@ -1,17 +1,19 @@
 #  Suivi de patrimoine
-Application web personnelle pour suivre l'évolution de son patrimoine dans le temps. Construite avec Streamlit, elle tourne en local et stocke tout en CSV — pas de compte, pas de cloud, pas de tierce partie avec accès à vos données.
+Application web personnelle pour suivre l'évolution de son patrimoine dans le temps. Construite avec Streamlit, elle tourne en local et stocke tout dans une base de données SQLite — pas de compte, pas de cloud, pas de tierce partie avec accès à vos données.
 
 
 ## Ce que ça fait
 Le patrimoine est divisé en deux types d'actifs. Les actifs financiers (actions, ETF, crypto) sont synchronisés automatiquement via Yahoo Finance à partir d'un ticker et d'une quantité détenue. Les actifs manuels (livrets, immobilier, fonds euros) sont mis à jour à la main.
 L'application conserve un historique de chaque actif et permet de visualiser l'évolution du patrimoine total ou par catégorie sur différentes périodes.
 
+Un mode démo est disponible pour tester l'application sans avoir à saisir vos propres données.
+
 ## Stack
 - Python / Streamlit
 - pandas pour les calculs
 - yfinance pour les prix en temps réel
 - Plotly pour les graphiques
-- Stockage local en CSV avec verrouillage de fichier
+- Stockage local en base de données SQLite
 
 ## Lancer le projet
 
