@@ -13,7 +13,7 @@ Point d'entrée unique : render(df)
 import streamlit as st
 import pandas as pd
 from services.assets import compute_by_category, compute_total
-from services.db import get_total_emprunts, load_emprunts
+from services.db import get_total_emprunts, load_emprunts, load_contrats
 from constants import CATEGORY_COLOR_MAP, CATEGORIES_AUTO, PLOTLY_LAYOUT
 
 
@@ -89,23 +89,42 @@ def _render_repartition_actifs(df: pd.DataFrame):
                 cols[3].caption("—")
 
 
-# ── Répartition par enveloppe fiscale ────────────────────────────────────────
+# ── Répartition par contrat ───────────────────────────────────────────
 
-def _render_enveloppes(df: pd.DataFrame):
-    df_env = df[df["enveloppe"].notna() & (df["enveloppe"].str.strip() != "")]
-    if df_env.empty:
+def _render_contrats(df: pd.DataFrame):
+    df_contrats_assets = df[df["contrat_id"].notna() & (df["contrat_id"].str.strip() != "")]
+    if df_contrats_assets.empty:
         return
 
-    totaux = (
-        df_env.groupby("enveloppe")["montant"]
-        .sum()
-        .sort_values(ascending=False)
-    )
-
-    st.subheader("Actifs par enveloppe", anchor=False)
-    with st.container(horizontal=True):
-        for enveloppe, montant in totaux.items():
-            st.metric(label=enveloppe, value=f"{montant:,.2f} €", border=True)
+    # Récupérer les informations des contrats
+    try:
+        df_contrats = load_contrats()
+        
+        # Joindre les données
+        df_merged = df_contrats_assets.merge(
+            df_contrats, 
+            left_on="contrat_id", 
+            right_on="id", 
+            how="left"
+        )
+        
+        # Grouper par contrat (établissement + enveloppe)
+        df_merged["contrat_display"] = df_merged["etablissement"] + " — " + df_merged["enveloppe"]
+        
+        totaux = (
+            df_merged.groupby("contrat_display")["montant"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+        
+        st.subheader("Actifs par contrat", anchor=False)
+        with st.container(horizontal=True):
+            for contrat, montant in totaux.items():
+                st.metric(label=contrat, value=f"{montant:,.2f} €", border=True)
+                
+    except Exception as e:
+        st.subheader("Actifs par contrat", anchor=False)
+        st.caption("Impossible d'afficher les contrats")
 
 
 # ── Résumé des passifs ────────────────────────────────────────────────────────
@@ -148,11 +167,10 @@ def render(df: pd.DataFrame):
 
     _render_repartition_actifs(df)
 
-
     df_emprunts = load_emprunts()
     if not df_emprunts.empty:
         st.divider()
         _render_passifs(df_emprunts, total_actifs)
 
     st.divider()
-    _render_enveloppes(df)
+    _render_contrats(df)

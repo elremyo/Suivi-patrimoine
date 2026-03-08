@@ -24,12 +24,14 @@ Points d'entrée publics :
 import streamlit as st
 import pandas as pd
 from services.asset_manager import (
-    create_auto_asset, create_manual_asset,
-    edit_auto_asset, edit_manual_asset,
-    remove_asset, update_at_date,
+    create_auto_asset,
+    create_manual_asset,
+    edit_auto_asset,
+    edit_manual_asset,
+    remove_asset,
+    update_at_date,
 )
 from services.pricer import validate_ticker, lookup_ticker
-from services.referentiel import get_courtiers, add_courtier
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES, TYPE_BIEN_OPTIONS
 from services.db import load_emprunts
 
@@ -143,66 +145,6 @@ def _contrat_fields(row=None):
         st.session_state.pop("_new_contrat", None)
     
     return contrat_id
-
-
-def _courtier_enveloppe_fields(row=None, show_enveloppe=True):
-    """
-    Affiche les champs Courtier et Enveloppe sous forme de listes déroulantes
-    alimentées par le référentiel. Si l'utilisateur choisit "+ Nouveau...",
-    un champ texte apparaît pour saisir une nouvelle valeur.
-    La nouvelle valeur est enregistrée dans le référentiel à la sauvegarde.
-    """
-    initial_courtier  = str(row.get("courtier",  "") or "").strip() if row is not None else ""
-    initial_enveloppe = str(row.get("enveloppe", "") or "").strip() if row is not None else ""
-
-    NOUVEAU_COURTIER  = "+ Nouveau courtier"
-
-    # ── Courtier ──────────────────────────────────────────────────────────────
-    courtiers = get_courtiers()
-
-    # Si la valeur actuelle n'est pas encore dans le référentiel, on l'affiche quand même
-    courtier_options = courtiers[:]
-    if initial_courtier and initial_courtier not in courtier_options:
-        courtier_options.insert(0, initial_courtier)
-    courtier_options.append(NOUVEAU_COURTIER)
-
-    default_idx = courtier_options.index(initial_courtier) if initial_courtier in courtier_options else 0
-
-    courtier_selection = st.selectbox(
-        "Courtier / Banque *",
-        options=courtier_options,
-        index=default_idx,
-        key="_form_courtier_select",
-    )
-
-    if courtier_selection == NOUVEAU_COURTIER:
-        courtier = st.text_input(
-            "Nom du nouveau courtier",
-            placeholder="ex. Boursorama, Binance, Crédit Agricole",
-            key="_form_courtier_new",
-        ).strip()
-    else:
-        courtier = courtier_selection
-
-    # ── Enveloppe ─────────────────────────────────────────────────────────────
-    enveloppe = ""
-    if show_enveloppe:
-        enveloppe_options = sorted(ENVELOPPES)
-        default_idx_env = enveloppe_options.index(initial_enveloppe) if initial_enveloppe in enveloppe_options else 0
-        enveloppe = st.selectbox(
-            "Enveloppe *",
-            options=enveloppe_options,
-            index=default_idx_env,
-            key="_form_enveloppe_select",
-        )
-
-    return courtier, enveloppe
-
-
-def _save_referentiel(courtier: str):
-    """Enregistre le courtier dans le référentiel si c'est une nouvelle valeur."""
-    if courtier:
-        add_courtier(courtier)   # idempotent : ignore si déjà présent
 
 
 # ── Ticker picker ─────────────────────────────────────────────────────────────

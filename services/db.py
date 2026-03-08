@@ -21,12 +21,13 @@ CATEGORY_TO_TYPE = {
     "Livrets": "livret",
     "Immobilier": "immobilier",
     "Fonds euros": "fonds_euro",
+    "Compte": "compte",
 }
 TYPE_TO_CATEGORY = {v: k for k, v in CATEGORY_TO_TYPE.items()}
 
 ASSETS_FLAT_COLUMNS = [
     "id", "nom", "categorie", "montant", "ticker", "quantite", "pru",
-    "courtier", "enveloppe", "contrat_id",
+    "contrat_id",
 ]
 IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2"]
 
@@ -178,15 +179,13 @@ def delete_contrat(contrat_id: str) -> tuple[bool, str]:
 
 def load_assets() -> pd.DataFrame:
     """
-    Retourne un DataFrame plat : id, nom, categorie, montant, ticker, quantite, pru,
-    courtier, enveloppe, contrat_id.
+    Retourne un DataFrame plat : id, nom, categorie, montant, ticker, quantite, pru, contrat_id.
     Pour l'immobilier, ajoute prix_achat, type_bien, adresse, superficie_m2, emprunt_id.
     """
     conn = get_conn()
     try:
         q = """
-        SELECT a.id, a.type, a.nom, a.montant_actuel, a.courtier, a.enveloppe,
-               a.contrat_id,
+        SELECT a.id, a.type, a.nom, a.montant_actuel, a.contrat_id,
                COALESCE(t.ticker, '') AS ticker,
                COALESCE(t.quantite, 0) AS quantite,
                COALESCE(t.pru, 0) AS pru
@@ -209,7 +208,7 @@ def load_assets() -> pd.DataFrame:
 
     df["categorie"] = df["type"].map(TYPE_TO_CATEGORY)
     df["montant"] = df["montant_actuel"]
-    df = df[["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe", "contrat_id"]]
+    df = df[["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "contrat_id"]]
 
     if not df_immo.empty and not df.empty:
         df = df.merge(df_immo, left_on="id", right_on="actif_id", how="left", suffixes=("", "_immo"))
@@ -248,25 +247,21 @@ def save_assets(df: pd.DataFrame) -> None:
             type_ = CATEGORY_TO_TYPE.get(str(row["categorie"]), "livret")
             nom = str(row["nom"])
             montant = float(row["montant"])
-            courtier = str(row.get("courtier", "") or "")
-            enveloppe = str(row.get("enveloppe", "") or "")
             contrat_id = row.get("contrat_id")
             contrat_id = None if (contrat_id is None or (isinstance(contrat_id, float) and pd.isna(contrat_id)) or contrat_id == "") else str(contrat_id)
 
             conn.execute(
                 """
-                INSERT INTO actifs (id, type, nom, montant_actuel, courtier, enveloppe, contrat_id, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                INSERT INTO actifs (id, type, nom, montant_actuel, contrat_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
                 ON CONFLICT(id) DO UPDATE SET
                     type = excluded.type,
                     nom = excluded.nom,
                     montant_actuel = excluded.montant_actuel,
-                    courtier = excluded.courtier,
-                    enveloppe = excluded.enveloppe,
                     contrat_id = excluded.contrat_id,
                     updated_at = datetime('now')
                 """,
-                (aid, type_, nom, montant, courtier, enveloppe, contrat_id),
+                (aid, type_, nom, montant, contrat_id),
             )
 
             if type_ in ("action", "crypto"):
@@ -619,6 +614,47 @@ def rename_courtier(ancien: str, nouveau: str, df_assets: pd.DataFrame) -> tuple
         nb = 0
     detail = f" ({nb} actif(s) mis à jour)" if nb > 0 else ""
     return True, f"Courtier renommé en « {nouveau} »{detail}.", df_assets
+
+
+def migrate_contrats_from_assets() -> tuple[int, str]:
+    """
+    Migre les actifs existants qui ont courtier/enveloppe vers le système de contrats.
+    Crée automatiquement les contrats nécessaires et met à jour les actifs.
+    Retourne (nombre_d_actifs_migrés, message).
+    """
+    conn = get_conn()
+    try:
+        # Récupérer les actifs qui ont courtier/enveloppe mais pas contrat_id
+        query = """
+        SELECT id, courtier, enveloppe 
+        FROM actifs 
+        WHERE courtier IS NOT NULL AND courtier != '' 
+          AND enveloppe IS NOT NULL AND enveloppe != ''
+          AND contrat_id IS NULL
+        """
+        cursor = conn.execute(query)
+        assets_to_migrate = cursor.fetchall()
+        
+        if not assets_to_migrate:
+            return 0, "Aucun actif à migrer."
+        
+        migrated_count = 0
+        for asset_id, courtier, enveloppe in assets_to_migrate:
+            # Créer ou récupérer le contrat
+            contrat_id = get_or_create_contrat(courtier, enveloppe)
+            
+            # Mettre à jour l'actif
+            conn.execute(
+                "UPDATE actifs SET contrat_id = ? WHERE id = ?",
+                (contrat_id, asset_id)
+            )
+            migrated_count += 1
+        
+        conn.commit()
+        return migrated_count, f"{migrated_count} actif(s) migré(s) vers les contrats."
+    
+    finally:
+        conn.close()
 
 
 # ── Export ────────────────────────────────────────────────────────────────────

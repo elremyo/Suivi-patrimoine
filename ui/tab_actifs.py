@@ -24,12 +24,23 @@ def _render_asset_row(row: pd.Series):
     cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5])
 
     # ── Colonne nom + infos discrètes ─────────────────────────────────────────
-    courtier_val = row.get("courtier", "")
-    courtier = "" if pd.isna(courtier_val) else str(courtier_val).strip()
-    enveloppe_val = row.get("enveloppe", "")
-    enveloppe = "" if pd.isna(enveloppe_val) else str(enveloppe_val).strip()
-    meta_parts = [p for p in (courtier, enveloppe) if p]
-    meta_str   = " · ".join(meta_parts)
+    contrat_id_val = row.get("contrat_id", "")
+    contrat_id = "" if pd.isna(contrat_id_val) else str(contrat_id_val).strip()
+    
+    # Récupérer les infos du contrat si disponible
+    contrat_info = ""
+    if contrat_id:
+        try:
+            from services.db import load_contrats
+            df_contrats = load_contrats()
+            contrat_match = df_contrats[df_contrats["id"] == contrat_id]
+            if not contrat_match.empty:
+                contrat_row = contrat_match.iloc[0]
+                contrat_info = f"{contrat_row['etablissement']} — {contrat_row['enveloppe']}"
+        except:
+            contrat_info = "Contrat inconnu"
+
+    meta_str = contrat_info
 
     if is_auto_row and row.get("ticker"):
         error_tickers = st.session_state.get("sync_error_tickers", set())

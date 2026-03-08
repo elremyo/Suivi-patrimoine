@@ -10,7 +10,6 @@ from services.storage import init_storage
 from services.assets import get_assets
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution
 from services.positions import init_positions, load_positions
-from services.referentiel import init_referentiel
 from ui.tab_synthese import render as render_synthese
 from ui.tab_actifs import render as render_actifs
 from ui.tab_emprunts import render as render_emprunts
@@ -55,7 +54,6 @@ df           = cached_load_assets()
 df_hist      = cached_load_historique()
 df_positions = cached_load_positions()
 
-init_referentiel(df)
 
 
 # ── Utilitaires UI ────────────────────────────────────────────────────────────
