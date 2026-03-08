@@ -94,14 +94,14 @@ def _contrat_fields(row=None):
     contrat_options.append(NOUVEAU_CONTRAT)
     
     # Trouver l'affichage correspondant au contrat_id initial
-    default_display = NOUVEAU_CONTRAT
+    default_display = contrat_options[0] if contrat_options else NOUVEAU_CONTRAT
     if initial_contrat_id:
         for display, cid in contrat_id_to_display.items():
             if cid == initial_contrat_id:
                 default_display = display
                 break
     
-    default_idx = contrat_options.index(default_display) if default_display in contrat_options else len(contrat_options) - 1
+    default_idx = contrat_options.index(default_display) if default_display in contrat_options else 0
     
     # ── Sélection du contrat ─────────────────────────────────────────────────
     contrat_selection = st.selectbox(
@@ -289,7 +289,9 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         key="_form_categorie",
     )
 
-    contrat_id = _contrat_fields(row if mode == "edit" else None)
+    contrat_id = None  # Par défaut None pour l'immobilier
+    if categorie != "Immobilier":
+        contrat_id = _contrat_fields(row if mode == "edit" else None)
 
     immo_params = None
     if categorie == "Immobilier":
@@ -369,7 +371,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         
         if not nom:
             st.warning("Le nom est obligatoire.")
-        elif not final_contrat_id:
+        elif categorie != "Immobilier" and not final_contrat_id:
             st.warning("Le contrat est obligatoire.")
         else:
             if mode == "create":
