@@ -60,7 +60,7 @@ def render(flash_fn) -> None:
     st.space(size="small")
 
     if df.empty:
-        st.caption("Aucun emprunt pour l'instant. Ajoute un prêt immobilier, un crédit conso, etc.")
+        st.info("Aucun emprunt pour l'instant. Ajoute un prêt immobilier, un crédit conso, etc.")
         return
 
     # ── En-tête des colonnes ──────────────────────────────────────────────────

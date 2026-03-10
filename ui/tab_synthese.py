@@ -15,6 +15,7 @@ import pandas as pd
 from services.assets import compute_by_category, compute_total
 from services.db import get_total_emprunts, load_emprunts, load_contrats
 from constants import CATEGORY_COLOR_MAP, CATEGORIES_AUTO, PLOTLY_LAYOUT
+from ui.asset_form import set_dialog_create
 
 
 # ── Métriques clés ────────────────────────────────────────────────────────────
@@ -162,8 +163,18 @@ def render(df: pd.DataFrame):
     _render_kpis(df)
 
     if df.empty:
-        st.info("Aucun actif enregistré. Ajoute des actifs pour voir la synthèse.")
-        return
+        with st.container(border=True):
+            st.markdown("### Bienvenue sur ton suivi de patrimoine 👋")
+            st.markdown(" ")
+            st.markdown("**1. Ajoute tes actifs**")
+            st.caption("Livrets, immobilier, actions, crypto, fonds euros — tous tes placements au même endroit.")
+            st.markdown("**2. Les prix se mettent à jour automatiquement**")
+            st.caption("Pour tes actions et cryptos, l'app récupère les cours en temps réel via Yahoo Finance.")
+            st.markdown("**3. Suis l'évolution de ton patrimoine**")
+            st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
+            if st.button("+ Ajouter mon premier actif", type="primary", use_container_width=True, key="btn_empty_state"):
+                set_dialog_create()
+                st.rerun()
 
     _render_repartition_actifs(df)
 

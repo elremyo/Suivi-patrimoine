@@ -189,18 +189,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
 
     # ── Liste des actifs ──────────────────────────────────────────────────────
     if df.empty:
-        with st.container(border=True):
-            st.markdown("### Bienvenue sur ton suivi de patrimoine 👋")
-            st.markdown(" ")
-            st.markdown("**1. Ajoute tes actifs**")
-            st.caption("Livrets, immobilier, actions, crypto, fonds euros — tous tes placements au même endroit.")
-            st.markdown("**2. Les prix se mettent à jour automatiquement**")
-            st.caption("Pour tes actions et cryptos, l'app récupère les cours en temps réel via Yahoo Finance.")
-            st.markdown("**3. Suis l'évolution de ton patrimoine**")
-            st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
-            if st.button("+ Ajouter mon premier actif", type="primary", use_container_width=True, key="btn_empty_state"):
-                set_dialog_create()
-                st.rerun()
+        st.info("Aucun actif pour l'instant. Ajoute un actif pour commencer.")
 
     else:
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]
