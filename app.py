@@ -18,7 +18,6 @@ from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog
 from ui.emprunt_form import render_emprunt_dialog
 from ui.sidebar import render as render_sidebar
-from services.demo_mode import is_demo_mode
 
 
 st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:", initial_sidebar_state="collapsed")
@@ -86,9 +85,6 @@ show_flash()
 st.logo(image=":material/finance_mode:", size="large", icon_image=":material/finance_mode:")
 
 st.title("Suivi de patrimoine", anchor=False)
-
-if is_demo_mode():
-    st.info("Mode démo. Pour le quitter, utilise le menu de gauche.", icon="👀")
 
 tab_synthese, tab_actifs, tab_passifs, tab_historique, tab_params = st.tabs([
     "Synthèse", "Actifs", "Passifs", "Historique", "Paramètres"

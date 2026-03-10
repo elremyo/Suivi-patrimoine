@@ -4,7 +4,7 @@ ui/tab_actifs.py
 Contenu du tab "Actifs" : liste des actifs.
 Les métriques globales (actifs / passifs / net) sont dans tab_synthese.py.
 Les modales sont gérées via ui/asset_form.py.
-Les exports, imports, mode démo et réinitialisation sont dans ui/sidebar.py.
+Les téléchargements et la réinitialisation sont dans ui/sidebar.py.
 """
 
 import streamlit as st
@@ -13,8 +13,6 @@ from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete, set_dialog_update
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
-from services.demo_mode import is_demo_mode, activate_demo, deactivate_demo
-from constants import DEMO_USER_NAME
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
@@ -203,10 +201,6 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
             if st.button("+ Ajouter mon premier actif", type="primary", use_container_width=True, key="btn_empty_state"):
                 set_dialog_create()
                 st.rerun()
-            st.divider()
-            st.markdown("**Pas encore prêt à saisir tes données ?**")
-            st.markdown("Explore l'app avec un profil fictif diversifié ~200 000 € sur un an !")
-            st.markdown(f"👀 Active la démo depuis le menu de gauche")
 
     else:
         categories_presentes = [c for c in CATEGORIES_ASSETS if c in df["categorie"].values]

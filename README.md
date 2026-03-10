@@ -6,8 +6,6 @@ Application web personnelle pour suivre l'évolution de son patrimoine dans le t
 Le patrimoine est divisé en deux types d'actifs. Les actifs financiers (actions, ETF, crypto) sont synchronisés automatiquement via Yahoo Finance à partir d'un ticker et d'une quantité détenue. Les actifs manuels (livrets, immobilier, fonds euros) sont mis à jour à la main.
 L'application conserve un historique de chaque actif et permet de visualiser l'évolution du patrimoine total ou par catégorie sur différentes périodes.
 
-Un mode démo est disponible pour tester l'application sans avoir à saisir vos propres données.
-
 ## Stack
 - Python / Streamlit
 - pandas pour les calculs
