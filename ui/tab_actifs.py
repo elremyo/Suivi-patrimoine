@@ -13,11 +13,12 @@ from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete, set_dialog_update
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
+from services.db import load_contrats
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
 
-def _render_asset_row(row: pd.Series):
+def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
     cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5])
 
@@ -27,15 +28,12 @@ def _render_asset_row(row: pd.Series):
     
     # Récupérer les infos du contrat si disponible
     contrat_info = ""
-    if contrat_id:
-        try:
-            from services.db import load_contrats
-            df_contrats = load_contrats()
-            contrat_match = df_contrats[df_contrats["id"] == contrat_id]
-            if not contrat_match.empty:
-                contrat_row = contrat_match.iloc[0]
-                contrat_info = f"{contrat_row['etablissement']} — {contrat_row['enveloppe']}"
-        except:
+    if contrat_id and df_contrats is not None:
+        contrat_match = df_contrats[df_contrats["id"] == contrat_id]
+        if not contrat_match.empty:
+            contrat_row = contrat_match.iloc[0]
+            contrat_info = f"{contrat_row['etablissement']} — {contrat_row['enveloppe']}"
+        else:
             contrat_info = "Contrat inconnu"
 
     meta_str = contrat_info
@@ -108,6 +106,9 @@ def _render_asset_row(row: pd.Series):
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     from services.assets import compute_total
+
+    # Charger les contrats une seule fois pour éviter les requêtes multiples
+    df_contrats = load_contrats()
 
     has_auto_assets = (
         not df.empty
@@ -202,7 +203,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
             df_cat = df[df["categorie"] == categorie]
             for _, row in df_cat.iterrows():
                 with st.container(border=True, vertical_alignment="center"):
-                    _render_asset_row(row)
+                    _render_asset_row(row, df_contrats)
             st.space(size="small")
 
     return df
