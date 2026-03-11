@@ -8,47 +8,10 @@ Point d'entrée unique : render(df, invalidate_cache_fn, flash_fn)
 
 import streamlit as st
 import pandas as pd
-from services.storage import (
-    download_assets, download_historique, download_positions,
-    reset_all_data,
-)
+from services.storage import reset_all_data
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     with st.sidebar:
-        # ── Téléchargement (visible uniquement si des données existent) ───────
-        if not df.empty:
-            st.subheader("Télécharger mes données", anchor=False)
-            st.download_button(
-                "Liste des actifs",
-                data=download_assets(df),
-                file_name="sauvegarde_actifs.csv",
-                mime="text/csv",
-                icon=":material/download:",
-                use_container_width=True,
-                key="btn_dl_assets",
-                help="Nom, catégorie, montant, ticker… de tous tes actifs.",
-            )
-            st.download_button(
-                "Historique des montants",
-                data=download_historique(),
-                file_name="sauvegarde_historique.csv",
-                mime="text/csv",
-                icon=":material/download:",
-                use_container_width=True,
-                key="btn_dl_historique",
-                help="Évolution des montants dans le temps (actifs manuels).",
-            )
-            st.download_button(
-                "Historique des positions",
-                data=download_positions(),
-                file_name="sauvegarde_positions.csv",
-                mime="text/csv",
-                icon=":material/download:",
-                use_container_width=True,
-                key="btn_dl_positions",
-                help="Évolution des quantités dans le temps (actions, cryptos).",
-            )
-
         # ── Réinitialisation (visible uniquement si données perso) ────────────
         if not df.empty:
             with st.expander("Supprimer mes données"):
