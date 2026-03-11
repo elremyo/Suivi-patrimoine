@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 def _make_empty_df():
     return pd.DataFrame(
-        columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
+        columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "contrat_id"]
     )
 
 
@@ -66,17 +66,7 @@ class TestCreateManualAsset:
             assert asset_id is not None
             assert len(str(asset_id)) > 0
 
-    def test_colonnes_courtier_enveloppe_presentes(self, tmp_path):
-        """Les colonnes courtier et enveloppe doivent exister."""
-        with _patch_db_path(tmp_path):
-            _init_storage()
-            from services.asset_manager import create_manual_asset
-            df = _make_empty_df()
-            df_result, _, _ = create_manual_asset(df, "Livret A", "Livrets", 10000.0,
-                                                   courtier="Banque", enveloppe="Livret réglementé")
 
-            assert df_result.iloc[0]["courtier"] == "Banque"
-            assert df_result.iloc[0]["enveloppe"] == "Livret réglementé"
 
 
 # ── Tests remove_asset ────────────────────────────────────────────────────────
@@ -90,7 +80,7 @@ class TestRemoveAsset:
             df = pd.DataFrame([{
                 "id": "aaa", "nom": "Livret A", "categorie": "Livrets",
                 "montant": 10000.0, "ticker": "", "quantite": 0.0, "pru": 0.0,
-                "courtier": "", "enveloppe": ""
+                "contrat_id": ""
             }])
             df_result, msg, msg_type = remove_asset(df, 0, "aaa")
 
@@ -104,10 +94,10 @@ class TestRemoveAsset:
             df = pd.DataFrame([
                 {"id": "aaa", "nom": "Livret A", "categorie": "Livrets",
                  "montant": 10000.0, "ticker": "", "quantite": 0.0, "pru": 0.0,
-                 "courtier": "", "enveloppe": ""},
+                 "contrat_id": ""},
                 {"id": "bbb", "nom": "Livret B", "categorie": "Livrets",
                  "montant": 5000.0, "ticker": "", "quantite": 0.0, "pru": 0.0,
-                 "courtier": "", "enveloppe": ""},
+                 "contrat_id": ""},
             ])
             df_result, _, _ = remove_asset(df, 0, "aaa")
 

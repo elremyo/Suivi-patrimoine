@@ -532,23 +532,3 @@ def load_referentiel() -> pd.DataFrame:
         conn.close()
 
 
-def init_referentiel_from_assets(df_assets: pd.DataFrame | None) -> None:
-    from constants import ENVELOPPES
-    conn = get_conn()
-    try:
-        cur = conn.execute("SELECT COUNT(*) FROM referentiel")
-        if cur.fetchone()[0] > 0:
-            return
-        rows = []
-        if df_assets is not None and not df_assets.empty:
-            for courtier in df_assets["courtier"].dropna().unique():
-                c = str(courtier).strip()
-                if c:
-                    rows.append(("courtier", c))
-        for env in ENVELOPPES:
-            rows.append(("enveloppe", env))
-        for kind, value in rows:
-            conn.execute("INSERT OR IGNORE INTO referentiel (kind, value) VALUES (?, ?)", (kind, value))
-        conn.commit()
-    finally:
-        conn.close()

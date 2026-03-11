@@ -21,8 +21,6 @@ CREATE TABLE IF NOT EXISTS actifs (
   type TEXT NOT NULL CHECK(type IN ('action', 'crypto', 'livret', 'immobilier', 'fonds_euro')),
   nom TEXT NOT NULL,
   montant_actuel REAL NOT NULL DEFAULT 0,
-  courtier TEXT,
-  enveloppe TEXT,
   contrat_id TEXT REFERENCES contrats(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -102,15 +100,3 @@ CREATE TABLE IF NOT EXISTS positions (
 
 CREATE INDEX IF NOT EXISTS idx_positions_date ON positions(date);
 CREATE INDEX IF NOT EXISTS idx_positions_asset ON positions(asset_id);
-
-
--- =============================================================================
--- Référentiel (courtiers / enveloppes) — sera remplacé par contrats
--- Conservé temporairement pour la migration
--- =============================================================================
-CREATE TABLE IF NOT EXISTS referentiel (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind TEXT NOT NULL CHECK(kind IN ('courtier', 'enveloppe')),
-  value TEXT NOT NULL,
-  UNIQUE(kind, value)
-);

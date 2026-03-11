@@ -48,7 +48,7 @@ class TestBuildTotalEvolution:
 
     def test_retourne_vide_si_assets_vide(self, df_hist_simple, df_positions_vide):
         df_assets_vide = pd.DataFrame(
-            columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"]
+            columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "contrat_id"]
         )
         result = build_total_evolution(
             df_assets_vide, df_hist_simple, df_positions_vide,
@@ -95,8 +95,8 @@ class TestBuildTotalEvolution:
     def test_total_a_date_connue(self, df_hist_simple, df_positions_vide):
         """À 2024-01-01 : Livret A = 9000, Immobilier = 195000 → total = 204000."""
         df_manuels = pd.DataFrame([
-            {"id": "aaa", "nom": "Livret A",    "categorie": "Livrets",    "montant": 10000.0,  "ticker": "", "quantite": 0.0, "pru": 0.0, "courtier": "", "enveloppe": ""},
-            {"id": "bbb", "nom": "Appartement", "categorie": "Immobilier", "montant": 200000.0, "ticker": "", "quantite": 0.0, "pru": 0.0, "courtier": "", "enveloppe": ""},
+            {"id": "aaa", "nom": "Livret A",    "categorie": "Livrets",    "montant": 10000.0,  "ticker": "", "quantite": 0.0, "pru": 0.0, "contrat_id": "contract_1"},
+            {"id": "bbb", "nom": "Appartement", "categorie": "Immobilier", "montant": 200000.0, "ticker": "", "quantite": 0.0, "pru": 0.0, "contrat_id": ""},
         ])
         result = build_total_evolution(
             df_manuels, df_hist_simple, df_positions_vide,

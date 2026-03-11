@@ -14,16 +14,16 @@ import pandas as pd
 @pytest.fixture
 def df_assets_vide():
     """DataFrame d'actifs vide avec les bonnes colonnes."""
-    return pd.DataFrame(columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "courtier", "enveloppe"])
+    return pd.DataFrame(columns=["id", "nom", "categorie", "montant", "ticker", "quantite", "pru", "contrat_id"])
 
 
 @pytest.fixture
 def df_assets_simple():
     """Quelques actifs représentatifs pour les tests."""
     return pd.DataFrame([
-        {"id": "aaa", "nom": "Livret A",    "categorie": "Livrets",        "montant": 10000.0,  "ticker": "",      "quantite": 0.0,  "pru": 0.0,   "courtier": "Banque",   "enveloppe": "Livret réglementé"},
-        {"id": "bbb", "nom": "Appartement", "categorie": "Immobilier",     "montant": 200000.0, "ticker": "",      "quantite": 0.0,  "pru": 0.0,   "courtier": "",         "enveloppe": ""},
-        {"id": "ccc", "nom": "Apple",       "categorie": "Actions & Fonds","montant": 1500.0,   "ticker": "AAPL",  "quantite": 10.0, "pru": 130.0, "courtier": "Degiro",   "enveloppe": "CTO"},
+        {"id": "aaa", "nom": "Livret A",    "categorie": "Livrets",        "montant": 10000.0,  "ticker": "",      "quantite": 0.0,  "pru": 0.0,   "contrat_id": "contract_1"},
+        {"id": "bbb", "nom": "Appartement", "categorie": "Immobilier",     "montant": 200000.0, "ticker": "",      "quantite": 0.0,  "pru": 0.0,   "contrat_id": ""},
+        {"id": "ccc", "nom": "Apple",       "categorie": "Actions & Fonds","montant": 1500.0,   "ticker": "AAPL",  "quantite": 10.0, "pru": 130.0, "contrat_id": "contract_2"},
     ])
 
 
