@@ -163,7 +163,6 @@ def _ticker_picker(initial_ticker: str = "") -> dict | None:
     if st.session_state.get("_form_ticker_last") != ticker_input:
         st.session_state.pop("_form_ticker_preview", None)
         st.session_state["_form_ticker_last"] = ticker_input
-
     if ticker_input == initial_ticker and initial_ticker != "":
         return {"ticker": ticker_input, "prefilled": True}
 
@@ -204,31 +203,35 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     auto_categories   = [c for c in CATEGORIES_ASSETS if c in CATEGORIES_AUTO]
     initial_categorie = row["categorie"] if mode == "edit" and row["categorie"] in auto_categories else auto_categories[0]
 
-    # ── Contrat (en premier) ─────────────────────────────────────────────────
-    contrat_id = _contrat_fields(row if mode == "edit" else None)
+    col_categorie, col_contrat = st.columns(2)
+    with col_categorie:
+        categorie = st.selectbox(
+            "Catégorie", options=auto_categories,
+            index=auto_categories.index(initial_categorie),
+            key="_form_categorie",
+        )
+    with col_contrat:
+        contrat_id = _contrat_fields(row if mode == "edit" else None)
 
-    # ── Catégorie ─────────────────────────────────────────────────────────────
-    categorie = st.selectbox(
-        "Catégorie", options=auto_categories,
-        index=auto_categories.index(initial_categorie),
-        key="_form_categorie",
-    )
 
-    # ── Ticker ───────────────────────────────────────────────────────────────
+
+    #Ticker 
     ticker_result = _ticker_picker(initial_ticker=initial_ticker)
 
     if ticker_result is None:
-        st.info("Vérifie le ticker pour continuer.")
         _cancel_button()
         return df
 
     # ── Quantité et PRU ─────────────────────────────────────────────────────
     if mode == "create":
-        quantite = st.number_input("Quantité", min_value=0.0, value=initial_quantite, step=1.0, format="%g", key="_form_quantite")
-        pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire, Prix d'achat (hors frais).")
+        col_quantite, col_pru = st.columns(2)
+        with col_quantite:
+            quantite = st.number_input("Quantité", min_value=0.0, value=initial_quantite, step=1.0, format="%g", key="_form_quantite")
+        with col_pru:
+            pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire, Prix d'achat (hors frais).")
     else:
         quantite = float(row.get("quantite") or 0.0)
-        pru      = float(row.get("pru")      or 0.0)
+        pru = float(row.get("pru") or 0.0)
         st.caption(f"Position actuelle : {quantite:g} unités · PRU {pru:g} € — modifiable via :material/history:")
 
     # ── Boutons ─────────────────────────────────────────────────────────────
@@ -287,21 +290,25 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
     initial_montant   = float(row["montant"]) if mode == "edit" else 0.0
     initial_categorie = row["categorie"] if mode == "edit" and row["categorie"] in manual_categories else manual_categories[0]
 
-    # ── Catégorie ─────────────────────────────────────────────────────────────
-    categorie = st.selectbox(
-        "Catégorie", options=manual_categories,
-        index=manual_categories.index(initial_categorie),
-        key="_form_categorie",
-    )
+    col_categorie, col_contrat = st.columns(2)
+    with col_categorie:
+        #Catégorie
+        categorie = st.selectbox(
+            "Catégorie", options=manual_categories,
+            index=manual_categories.index(initial_categorie),
+            key="_form_categorie",
+        )
+    with col_contrat:
+        #Contrat (après catégorie, pour conditionner l'affichage)
+        contrat_id = None  # Par défaut None pour l'immobilier
+        if categorie != "Immobilier":
+            contrat_id = _contrat_fields(row if mode == "edit" else None)
 
-    # ── Contrat (après catégorie, pour conditionner l'affichage) ───────────────
-    contrat_id = None  # Par défaut None pour l'immobilier
-    if categorie != "Immobilier":
-        contrat_id = _contrat_fields(row if mode == "edit" else None)
-
-    # ── Nom et Montant ───────────────────────────────────────────────────────
-    nom      = st.text_input("Nom *", value=initial_nom, key="_form_nom")
-    montant  = st.number_input("Montant (€)", min_value=0.0, value=initial_montant, step=100.0, key="_form_montant")
+    col_nom, col_montant = st.columns(2)
+    with col_nom:
+        nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
+    with col_montant:
+        montant = st.number_input("Montant (€)", min_value=0.0, value=initial_montant, step=100.0, key="_form_montant")
 
     immo_params = None
     if categorie == "Immobilier":
