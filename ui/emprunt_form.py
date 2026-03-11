@@ -95,7 +95,7 @@ def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
             step=50.0,
             key="_emprunt_form_mensualite",
         )
-    d1, d2 = st.columns(2)
+    d1, d2, d3 = st.columns([0.7, 0.3, 1],vertical_alignment="bottom")
     with d1:
         duree_mois = st.number_input(
             "Durée (mois)",
@@ -103,8 +103,12 @@ def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
             value=int(edit_row["duree_mois"]) if edit_row is not None else 240,
             step=12,
             key="_emprunt_form_duree",
+            max_value=360,
         )
     with d2:
+        #afficher la durée en années
+        st.caption(f"{duree_mois // 12} ans {duree_mois % 12} mois")
+    with d3:
         date_debut_val = _date_to_str(edit_row["date_debut"]) if edit_row is not None else date.today().isoformat()
         date_debut = st.date_input(
             "Date de début",
