@@ -82,10 +82,16 @@ def _render_repartition_actifs(df: pd.DataFrame):
 
             # PnL (uniquement si disponible)
             if pnl is not None:
+                # Calcul du pourcentage
+                df_cat = df[df["categorie"] == categorie]
+                valeur_achat = (df_cat["pru"] * df_cat["quantite"]).sum()
+                pourcentage = (pnl / valeur_achat * 100) if valeur_achat > 0 else 0.0
+                
                 sign = "+" if pnl >= 0 else ""
+                sign_pct = "+" if pourcentage >= 0 else ""
                 badge_color = "green" if pnl >= 0 else "red"
                 icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
-                cols[3].markdown(f":{badge_color}-badge[{icon} {sign}{pnl:,.2f} €]")
+                cols[3].markdown(f":{badge_color}-badge[{icon} {sign}{pnl:,.2f} € ({sign_pct}{pourcentage:.1f}%)]")
             else:
                 cols[3].caption("—")
 
