@@ -9,7 +9,8 @@ def init_positions():
 
 
 def load_positions() -> pd.DataFrame:
-    return db.load_positions()
+    from services.db_positions import load_positions
+    return load_positions()
 
 
 def record_position(asset_id: str, quantite: float, record_date=None):
@@ -17,12 +18,14 @@ def record_position(asset_id: str, quantite: float, record_date=None):
     Enregistre la quantité détenue pour un actif à une date donnée.
     Si un enregistrement existe déjà pour ce jour, il est écrasé.
     """
-    db.record_position(asset_id, quantite, record_date)
+    from services.db_positions import record_position
+    record_position(asset_id, quantite, record_date)
 
 
 def delete_asset_positions(asset_id: str):
     """Supprime toutes les positions d'un actif (utile à la suppression d'un actif)."""
-    db.delete_asset_positions(asset_id)
+    from services.db_positions import delete_asset_positions
+    delete_asset_positions(asset_id)
 
 
 def get_quantity_at(asset_id: str, at_date: pd.Timestamp, df_positions: pd.DataFrame) -> float | None:

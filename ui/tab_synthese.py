@@ -13,7 +13,8 @@ Point d'entrée unique : render(df)
 import streamlit as st
 import pandas as pd
 from services.assets import compute_by_category, compute_total
-from services.db import get_total_emprunts, load_emprunts, load_contrats
+from services.db_emprunts import get_total_emprunts, load_emprunts
+from services.db_contrats import load_contrats
 from constants import CATEGORY_COLOR_MAP, CATEGORIES_AUTO, PLOTLY_LAYOUT
 from ui.asset_form import set_dialog_create
 

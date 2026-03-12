@@ -7,7 +7,7 @@ Onglet Passifs : liste des emprunts, ajout / modification / suppression (modales
 import streamlit as st
 import pandas as pd
 
-from services.db import load_emprunts, get_total_emprunts
+from services.db_emprunts import load_emprunts, get_total_emprunts
 from ui.emprunt_form import set_emprunt_dialog_create, set_emprunt_dialog_edit, set_emprunt_dialog_delete
 
 

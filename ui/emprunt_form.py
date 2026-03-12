@@ -19,7 +19,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-from services.db import load_emprunts, create_emprunt, update_emprunt, delete_emprunt
+from services.db_emprunts import load_emprunts, create_emprunt, update_emprunt, delete_emprunt
 
 
 def set_emprunt_dialog_create():

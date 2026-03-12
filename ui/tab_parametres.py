@@ -8,7 +8,7 @@ Point d'entrée unique : render(df, invalidate_cache_fn)
 
 import streamlit as st
 import pandas as pd
-from services.db import load_contrats, add_contrat, update_contrat, delete_contrat
+from services.db_contrats import load_contrats, add_contrat, update_contrat, delete_contrat
 
 
 def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):

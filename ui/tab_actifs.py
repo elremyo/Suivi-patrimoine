@@ -13,7 +13,7 @@ from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete, set_dialog_update
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
-from services.db import load_contrats
+from services.db_contrats import load_contrats
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────

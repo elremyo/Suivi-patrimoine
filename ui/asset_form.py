@@ -33,7 +33,7 @@ from services.asset_manager import (
 )
 from services.pricer import validate_ticker, lookup_ticker
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES, TYPE_BIEN_OPTIONS
-from services.db import load_emprunts
+from services.db_emprunts import load_emprunts
 
 
 # ── Gestion de l'état des modales ─────────────────────────────────────────────
@@ -74,7 +74,7 @@ def _contrat_fields(row=None):
     Si l'utilisateur choisit "+ Nouveau contrat...", des champs apparaissent
     pour créer un nouveau contrat.
     """
-    from services.db import load_contrats, get_or_create_contrat
+    from services.db_contrats import load_contrats, get_or_create_contrat
     
     initial_contrat_id = str(row.get("contrat_id", "") or "").strip() if row is not None else ""
     
@@ -247,7 +247,7 @@ def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         if contrat_id is None and "_new_contrat" in st.session_state:
             new_contrat = st.session_state["_new_contrat"]
             if new_contrat["etablissement"] and new_contrat["enveloppe"]:
-                from services.db import get_or_create_contrat
+                from services.db_contrats import get_or_create_contrat
                 final_contrat_id = get_or_create_contrat(
                     new_contrat["etablissement"], 
                     new_contrat["enveloppe"]
@@ -380,7 +380,7 @@ def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
         if contrat_id is None and "_new_contrat" in st.session_state:
             new_contrat = st.session_state["_new_contrat"]
             if new_contrat["etablissement"] and new_contrat["enveloppe"]:
-                from services.db import get_or_create_contrat
+                from services.db_contrats import get_or_create_contrat
                 final_contrat_id = get_or_create_contrat(
                     new_contrat["etablissement"], 
                     new_contrat["enveloppe"]

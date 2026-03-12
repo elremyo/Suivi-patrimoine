@@ -12,11 +12,13 @@ def init_storage():
 
 
 def load_assets():
-    return db.load_assets()
+    from services.db_actifs import load_assets
+    return load_assets()
 
 
 def save_assets(df):
-    db.save_assets(df)
+    from services.db_actifs import save_assets
+    save_assets(df)
 
 
 def reset_all_data() -> str:

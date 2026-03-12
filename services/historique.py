@@ -12,7 +12,8 @@ def init_historique():
 
 
 def load_historique() -> pd.DataFrame:
-    return db.load_historique()
+    from services.db_historique import load_historique
+    return load_historique()
 
 
 def record_montant(asset_id: str, montant: float, record_date: date | None = None):
@@ -20,12 +21,14 @@ def record_montant(asset_id: str, montant: float, record_date: date | None = Non
     Enregistre le montant d'un actif manuel à une date donnée.
     Si un enregistrement existe déjà pour ce jour et cet actif, il est écrasé.
     """
-    db.record_montant(asset_id, montant, record_date)
+    from services.db_historique import record_montant
+    record_montant(asset_id, montant, record_date)
 
 
 def delete_asset_history(asset_id: str):
     """Supprime tout l'historique d'un actif (utile à la suppression d'un actif)."""
-    db.delete_asset_history(asset_id)
+    from services.db_historique import delete_asset_history
+    delete_asset_history(asset_id)
 
 
 def get_montant_at(asset_id: str, at_date: pd.Timestamp, df_hist: pd.DataFrame) -> float | None:
