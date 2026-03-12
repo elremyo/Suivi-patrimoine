@@ -85,3 +85,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def reset_all_data() -> str:
+    """Supprime la base locale pour repartir de zéro."""
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+    return "Toutes les données ont été supprimées."

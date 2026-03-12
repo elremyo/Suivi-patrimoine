@@ -25,8 +25,8 @@ def _patch_db_path(tmp_path):
 
 def _init_storage():
     """Crée la base et les tables (à appeler après le patch DB_PATH)."""
-    from services.storage import init_storage
-    init_storage()
+    from services.db import init_db
+    init_db()
 
 
 # ── Tests create_manual_asset ─────────────────────────────────────────────────

@@ -8,7 +8,7 @@ Point d'entrée unique : render(df, invalidate_cache_fn, flash_fn)
 
 import streamlit as st
 import pandas as pd
-from services.storage import reset_all_data
+from services.db import reset_all_data
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     with st.sidebar:

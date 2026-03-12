@@ -1,6 +1,6 @@
 import uuid
 import pandas as pd
-from services.storage import load_assets, COLUMNS
+from services.db_actifs import load_assets, ASSETS_FLAT_COLUMNS as COLUMNS
 
 
 def get_assets() -> pd.DataFrame:

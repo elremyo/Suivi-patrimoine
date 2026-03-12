@@ -16,7 +16,7 @@ from services.assets import add_asset, update_asset, delete_asset
 from services.historique import record_montant, delete_asset_history
 from services.positions import record_position, delete_asset_positions
 from services.pricer import get_name, refresh_auto_assets, validate_ticker
-from services.storage import save_assets
+from services.db_actifs import save_assets
 from constants import CATEGORIES_AUTO
 
 

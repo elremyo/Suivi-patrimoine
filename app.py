@@ -6,7 +6,7 @@ Point d'entrée de l'application Streamlit.
 
 import streamlit as st
 import pandas as pd
-from services.storage import init_storage
+from services.db import init_db
 from services.assets import get_assets
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution, build_asset_evolution
 from services.positions import init_positions, load_positions
@@ -23,7 +23,7 @@ from ui.sidebar import render as render_sidebar
 st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:", initial_sidebar_state="collapsed")
 
 
-init_storage()
+init_db()
 init_historique()
 init_positions()
 
