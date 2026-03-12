@@ -12,6 +12,7 @@ import pandas as pd
 from datetime import datetime
 from services.asset_manager import refresh_prices
 from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete, set_dialog_update
+from ui.asset_detail import set_asset_detail, is_asset_detail_active, get_current_asset_id
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
 from services.db_contrats import load_contrats
 
@@ -20,7 +21,7 @@ from services.db_contrats import load_contrats
 
 def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None):
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5])
+    cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5], vertical_alignment="center")
 
     # ── Colonne nom + infos discrètes ─────────────────────────────────────────
     contrat_id_val = row.get("contrat_id", "")
@@ -48,8 +49,24 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None):
         ticker_line = f"{ticker}"
         if meta_str:
             ticker_line += f" · {meta_str}"
-        cols[0].write(row["nom"])
-        cols[0].markdown(f"{icon} :small[:grey[{ticker_line}]]")
+
+        if cols[0].button(
+            row["nom"], 
+            key=f"detail_{row['id']}", 
+            help="Voir les détails de cet actif", 
+            type="tertiary",
+            icon=":material/article:",
+            icon_position="right",
+            width="content",
+        ):
+            set_asset_detail(row["id"])
+            st.rerun()
+
+        # Rendre le ticker cliquable pour ouvrir la page de détail
+        with cols[0].container(horizontal=True, width="content",vertical_alignment="center"):
+
+            st.markdown(f"{icon} :small[:grey[{ticker_line}]]")
+
     else:
         cols[0].write(row["nom"])
         if meta_str:
@@ -106,6 +123,13 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None):
 
 def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     from services.assets import compute_total
+    from ui.asset_detail import render_asset_detail, is_asset_detail_active, get_current_asset_id
+
+    # Si une page de détail est active, l'afficher
+    if is_asset_detail_active():
+        asset_id = get_current_asset_id()
+        render_asset_detail(asset_id, df)
+        return df
 
     # Charger les contrats une seule fois pour éviter les requêtes multiples
     df_contrats = load_contrats()
