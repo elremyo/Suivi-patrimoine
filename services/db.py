@@ -6,7 +6,9 @@ Utilitaires core de la base SQLite.
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 
 from constants import DB_PATH
 
@@ -20,6 +22,46 @@ def get_conn() -> sqlite3.Connection:
     return sqlite3.connect(DB_PATH)
 
 
+@contextmanager
+def db_connection() -> Generator[sqlite3.Connection, None, None]:
+    """Context manager pour les connexions SQLite.
+    
+    Gère automatiquement :
+    - Ouverture de la connexion
+    - Commit en cas de succès
+    - Rollback en cas d'erreur
+    - Fermeture systématique
+    
+    Usage:
+        with db_connection() as conn:
+            conn.execute("INSERT INTO actifs VALUES (?, ?)", (id, nom))
+    """
+    conn = get_conn()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@contextmanager
+def db_readonly() -> Generator[sqlite3.Connection, None, None]:
+    """Context manager pour les lectures seule (pas de commit/rollback).
+    
+    Usage:
+        with db_readonly() as conn:
+            df = pd.read_sql_query("SELECT * FROM actifs", conn)
+    """
+    conn = get_conn()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def init_db() -> None:
     """Crée le fichier DB et les tables s'ils n'existent pas.
     Applique aussi les migrations nécessaires sur une base existante."""
@@ -29,13 +71,9 @@ def init_db() -> None:
         raise FileNotFoundError(f"Schéma introuvable : {schema_path}")
     with open(schema_path, encoding="utf-8") as f:
         sql = f.read()
-    conn = get_conn()
-    try:
+    with db_connection() as conn:
         conn.executescript(sql)
-        conn.commit()
         _migrate(conn)
-    finally:
-        conn.close()
 
 
 def _migrate(conn: sqlite3.Connection) -> None:

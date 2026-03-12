@@ -5,7 +5,7 @@ Gestion des actifs et leurs spécificités (ticker, immobilier).
 """
 
 import pandas as pd
-from .db import get_conn
+from .db import db_readonly, db_connection
 
 # Mapping catégorie (UI / CSV) <-> type (DB)
 CATEGORY_TO_TYPE = {
@@ -30,8 +30,7 @@ def load_assets() -> pd.DataFrame:
     Retourne un DataFrame plat : id, nom, categorie, montant, ticker, quantite, pru, contrat_id.
     Pour l'immobilier, ajoute prix_achat, type_bien, adresse, superficie_m2, emprunt_id.
     """
-    conn = get_conn()
-    try:
+    with db_readonly() as conn:
         q = """
         SELECT a.id, a.type, a.nom, a.montant_actuel, a.contrat_id,
                COALESCE(t.ticker, '') AS ticker,
@@ -48,11 +47,6 @@ def load_assets() -> pd.DataFrame:
             df_immo = pd.read_sql_query(q_immo, conn)
         except pd.errors.DatabaseError:
             df_immo = pd.DataFrame()
-
-        conn.close()
-    except Exception:
-        conn.close()
-        raise
 
     df["categorie"] = df["type"].map(TYPE_TO_CATEGORY)
     df["montant"] = df["montant_actuel"]
@@ -72,18 +66,13 @@ def load_assets() -> pd.DataFrame:
 def save_assets(df: pd.DataFrame) -> None:
     """Persiste le DataFrame plat dans les tables actifs, actifs_ticker, actifs_immobilier."""
     if df.empty:
-        conn = get_conn()
-        try:
+        with db_connection() as conn:
             conn.execute("DELETE FROM actifs_ticker")
             conn.execute("DELETE FROM actifs_immobilier")
             conn.execute("DELETE FROM actifs")
-            conn.commit()
-        finally:
-            conn.close()
         return
 
-    conn = get_conn()
-    try:
+    with db_connection() as conn:
         ids_in_df = set(df["id"].astype(str))
         cur = conn.execute("SELECT id FROM actifs")
         existing_ids = {row[0] for row in cur.fetchall()}
@@ -156,27 +145,18 @@ def save_assets(df: pd.DataFrame) -> None:
             else:
                 conn.execute("DELETE FROM actifs_immobilier WHERE actif_id = ?", (aid,))
 
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def get_total_by_type() -> pd.DataFrame:
-    conn = get_conn()
-    try:
+    with db_readonly() as conn:
         df = pd.read_sql_query(
             "SELECT type, SUM(montant_actuel) AS total FROM actifs GROUP BY type", conn,
         )
         df["categorie"] = df["type"].map(TYPE_TO_CATEGORY)
         return df[["categorie", "total"]].rename(columns={"total": "montant"})
-    finally:
-        conn.close()
 
 
 def get_total() -> float:
-    conn = get_conn()
-    try:
+    with db_readonly() as conn:
         cur = conn.execute("SELECT COALESCE(SUM(montant_actuel), 0) FROM actifs")
         return float(cur.fetchone()[0])
-    finally:
-        conn.close()

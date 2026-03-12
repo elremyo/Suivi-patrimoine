@@ -7,7 +7,7 @@ Gestion des emprunts et calcul du capital restant dû.
 import uuid
 import pandas as pd
 from datetime import date
-from .db import get_conn
+from .db import db_readonly, db_connection
 
 
 def _compute_capital_restant_du(
@@ -50,8 +50,7 @@ def _compute_capital_restant_du(
 
 def load_emprunts(as_of_date: date | None = None) -> pd.DataFrame:
     """Charge tous les emprunts avec calcul du capital restant dû."""
-    conn = get_conn()
-    try:
+    with db_readonly() as conn:
         df = pd.read_sql_query(
             """SELECT id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin
                FROM emprunts ORDER BY nom""",
@@ -74,15 +73,12 @@ def load_emprunts(as_of_date: date | None = None) -> pd.DataFrame:
                 except (TypeError, ValueError):
                     df.loc[i, "capital_restant_du"] = 0.0
         return df
-    finally:
-        conn.close()
 
 
 def create_emprunt(nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin=None) -> str:
     """Crée un nouvel emprunt."""
     emprunt_id = str(uuid.uuid4())
-    conn = get_conn()
-    try:
+    with db_connection() as conn:
         conn.execute(
             """INSERT INTO emprunts (id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -90,16 +86,12 @@ def create_emprunt(nom, montant_emprunte, taux_annuel, mensualite, duree_mois, d
              date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
              date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d"))),
         )
-        conn.commit()
-        return emprunt_id
-    finally:
-        conn.close()
+    return emprunt_id
 
 
 def update_emprunt(emprunt_id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin=None) -> None:
     """Met à jour un emprunt existant."""
-    conn = get_conn()
-    try:
+    with db_connection() as conn:
         conn.execute(
             """UPDATE emprunts SET nom = ?, montant_emprunte = ?, taux_annuel = ?, mensualite = ?, duree_mois = ?,
                date_debut = ?, date_fin = ?, updated_at = datetime('now') WHERE id = ?""",
@@ -108,19 +100,12 @@ def update_emprunt(emprunt_id, nom, montant_emprunte, taux_annuel, mensualite, d
              date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d")),
              emprunt_id),
         )
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def delete_emprunt(emprunt_id: str) -> None:
     """Supprime un emprunt."""
-    conn = get_conn()
-    try:
+    with db_connection() as conn:
         conn.execute("DELETE FROM emprunts WHERE id = ?", (emprunt_id,))
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def get_total_emprunts(as_of_date: date | None = None) -> float:
