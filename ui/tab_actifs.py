@@ -141,22 +141,10 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
         and (df["ticker"] != "").any()
     )
 
-    if "prices_refreshed" not in st.session_state and has_auto_assets:
-        with st.spinner("Actualisation des prix en cours…"):
-            df, msg, msg_type = refresh_prices(df)
-        st.session_state["prices_refreshed"] = True
-        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
-        st.session_state["sync_error_tickers"] = set(
-            msg.replace("Tickers introuvables : ", "").split(", ")
-        ) if msg_type == "warning" else set()
-        if msg_type != "success":
-            flash_fn(msg, msg_type)
-        invalidate_cache_fn()
-        st.rerun()
-
     if has_auto_assets and "sync_time" not in st.session_state:
-        st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+        st.session_state["sync_time"] = "—"
         st.session_state["sync_error_tickers"] = set()
+
 
     # ── Métriques de l'onglet Actifs ──────────────────────────────────────────
     total = compute_total(df)

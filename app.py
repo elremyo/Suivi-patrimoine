@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 from services.db import init_db
 from services.assets import get_assets
+from services.asset_manager import refresh_prices
 from services.historique import init_historique, load_historique, build_total_evolution, build_category_evolution, build_asset_evolution
 from services.positions import init_positions, load_positions
 from ui.tab_synthese import render as render_synthese
@@ -18,6 +19,9 @@ from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog
 from ui.emprunt_form import render_emprunt_dialog
 from ui.sidebar import render as render_sidebar
+from constants import CATEGORIES_AUTO
+from datetime import datetime
+
 
 
 st.set_page_config(page_title="Suivi de patrimoine", layout="wide", page_icon=":material/finance_mode:", initial_sidebar_state="collapsed")
@@ -54,6 +58,29 @@ df           = cached_load_assets()
 df_hist      = cached_load_historique()
 df_positions = cached_load_positions()
 
+
+# ── Refresh automatique des prix au démarrage de session ─────────────────────
+
+_has_auto = (
+    not df.empty
+    and df["categorie"].isin(CATEGORIES_AUTO).any()
+    and df["ticker"].notna().any()
+    and (df["ticker"] != "").any()
+)
+
+if "prices_refreshed" not in st.session_state and _has_auto:
+    with st.spinner("Actualisation des prix en cours…"):
+        df, _msg, _msg_type = refresh_prices(df)
+    st.session_state["prices_refreshed"] = True
+    st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+    st.session_state["sync_error_tickers"] = (
+        set(_msg.replace("Tickers introuvables : ", "").split(", "))
+        if _msg_type == "warning" else set()
+    )
+    if _msg_type != "success":
+        flash(_msg, _msg_type)
+    invalidate_data_cache()
+    st.rerun()
 
 
 # ── Utilitaires UI ────────────────────────────────────────────────────────────
