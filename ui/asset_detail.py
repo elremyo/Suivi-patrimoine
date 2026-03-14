@@ -25,12 +25,12 @@ def get_asset_info(ticker: str) -> dict:
         fast = t.fast_info
         
         # Prix actuel
-        current_price = get_price(ticker)
+        current_price = fast.last_price if fast.last_price else None
         
 
         return {
             "ticker": ticker,
-            "name": get_name(ticker),
+            "name": info.get("longName") or info.get("shortName") or ticker,
             "current_price": current_price,
             "currency": fast.currency or info.get("currency", "EUR"),
             "market_cap": info.get("marketCap") or info.get("totalAssets"),
