@@ -11,10 +11,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import yfinance as yf
 from services.pricer import fetch_historical_prices, get_price, get_name
-from constants import PERIOD_OPTIONS, PERIOD_DEFAULT, PLOTLY_LAYOUT, CATEGORIES_AUTO
-from datetime import datetime, timedelta
+from constants import PERIOD_OPTIONS, PERIOD_DEFAULT, PLOTLY_LAYOUT, CATEGORIES_AUTO, CACHE_TTL_SECONDS
 
-
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def get_asset_info(ticker: str) -> dict:
     """
     Récupère les informations détaillées d'un actif depuis yfinance.
@@ -23,28 +22,20 @@ def get_asset_info(ticker: str) -> dict:
     try:
         t = yf.Ticker(ticker)
         info = t.info
+        fast = t.fast_info
         
         # Prix actuel
         current_price = get_price(ticker)
         
-        # Secteur
-        sector = info.get("sector")
-        if not sector:
-            sector = info.get("category")
-        
-        # Capitalisation 
-        market_cap = info.get("marketCap")
-        if not market_cap:
-            market_cap = info.get("totalAssets")
-        
+
         return {
             "ticker": ticker,
             "name": get_name(ticker),
             "current_price": current_price,
-            "currency": info.get("currency", "EUR"),
-            "market_cap": market_cap,
+            "currency": fast.currency or info.get("currency", "EUR"),
+            "market_cap": info.get("marketCap") or info.get("totalAssets"),
             "volume": info.get("volume"),
-            "sector": sector,
+            "sector": info.get("sector") or info.get("category"),
             "industry": info.get("industry") or info.get("categoryName"),
             "description": info.get("longBusinessSummary", "") or info.get("objective", ""),
             "website": info.get("website"),
@@ -54,7 +45,7 @@ def get_asset_info(ticker: str) -> dict:
         return None
 
 
-def render_price_chart(historical_data: pd.DataFrame, ticker: str, asset_info: dict, pru: float = None):
+def render_price_chart(historical_data: pd.DataFrame, ticker: str, pru: float = None):
     """
     Affiche le graphique historique des prix.
     """
@@ -102,6 +93,26 @@ def render_price_chart(historical_data: pd.DataFrame, ticker: str, asset_info: d
     
     st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
 
+@st.fragment
+def _render_chart_section(ticker: str, pru: float = None):
+    # Sélecteur de période format radio (comme dans l'onglet Historique)
+    selected_period = st.radio(
+        "Période",
+        options=list(PERIOD_OPTIONS.keys()),
+        index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
+        horizontal=True,
+        key="asset_detail_period_selector",
+        label_visibility="collapsed"
+    )
+    period = PERIOD_OPTIONS[selected_period][0]
+    
+    with st.spinner("Chargement des données historiques..."):
+        historical_data = fetch_historical_prices((ticker,), period)
+    
+    if not historical_data.empty:
+        render_price_chart(historical_data, ticker, pru)
+    else:
+        st.warning("Aucune donnée historique disponible pour cette période")
 
 def render_asset_info(asset_info: dict):
     """
@@ -202,25 +213,8 @@ def render_asset_detail(asset_id: str, df: pd.DataFrame):
     # Graphique historique
     st.subheader("Graphique historique", anchor=False)
 
-    # Sélecteur de période format radio (comme dans l'onglet Historique)
-    selected_period = st.radio(
-        "Période",
-        options=list(PERIOD_OPTIONS.keys()),
-        index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
-        horizontal=True,
-        key="asset_detail_period_selector",
-        label_visibility="collapsed"
-    )
-    period = PERIOD_OPTIONS[selected_period][0]
-    
-    with st.spinner("Chargement des données historiques..."):
-        historical_data = fetch_historical_prices((ticker,), period)
-    
-    if not historical_data.empty:
-        render_price_chart(historical_data, ticker, asset_info, asset.get("pru"))
-    else:
-        st.warning("Aucune donnée historique disponible pour cette période")
-    
+    _render_chart_section(ticker, asset.get("pru"))
+
     # Informations complémentaires
     
     if asset_info.get("industry"):
