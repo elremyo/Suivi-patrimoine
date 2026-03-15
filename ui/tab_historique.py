@@ -38,7 +38,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         return
 
     # ── Sélecteurs ────────────────────────────────────────────────────────────
-    col_period, col_benchmark = st.columns([4, 2])
+    col_period, col_benchmark = st.columns([5, 2])
 
     with col_period:
         period_label = st.radio(
@@ -55,6 +55,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
             options=list(BENCHMARK_OPTIONS.keys()),
             index=0,
             key="benchmark_selector",
+            help="Comparer avec un indice de référence. Disponible uniquement avec le total patrimoine."
         )
 
     yf_period, nb_jours = PERIOD_OPTIONS[period_label]
@@ -84,20 +85,20 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         if not df_benchmark.empty:
             df_benchmark = df_benchmark[df_benchmark.index >= start_date]
 
-    # Sélecteur de séries
+    # Sélecteur de catégories
     options_total = ["Total patrimoine"]
     options_cat = list(cat_evo.columns) if not cat_evo.empty else []
     all_options = options_total + options_cat
 
     selected = st.multiselect(
-        "Séries à afficher",
+        "Catégories à afficher",
         options=all_options,
         default=all_options,
-        placeholder="Choisir au moins une série…",
+        placeholder="Choisir au moins une catégorie…",
     )
 
     if not selected:
-        st.info("Sélectionne au moins une série à afficher.")
+        st.info("Sélectionne au moins une catégorie à afficher.")
         return
 
     _render_chart(selected, total_evo, cat_evo, options_cat, df_benchmark, benchmark_ticker, benchmark_label)
