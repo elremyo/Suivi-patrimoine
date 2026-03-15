@@ -201,7 +201,7 @@ def fetch_historical_prices(tickers: tuple, period: str = PERIOD_OPTIONS[PERIOD_
             if currency == "EUR" or currency not in fx_rates_hist:
                 continue
             fx_series = fx_rates_hist[currency].reindex(close.index, method="ffill")
-            close[ticker] = (close[ticker] * fx_series).round(4)
+            close.loc[:, ticker] = (close[ticker] * fx_series).round(4)
 
         return close
     except Exception:
