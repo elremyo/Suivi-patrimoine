@@ -93,7 +93,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     selected = st.multiselect(
         "Catégories à afficher",
         options=all_options,
-        default=all_options,
+        default=["Total patrimoine"],
         placeholder="Choisir au moins une catégorie…",
     )
 
