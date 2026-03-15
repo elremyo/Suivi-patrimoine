@@ -9,6 +9,8 @@ Point d'entrée unique : render(df, invalidate_cache_fn)
 import streamlit as st
 import pandas as pd
 from services.db_contrats import load_contrats, add_contrat, update_contrat, delete_contrat
+from services.db import reset_all_data
+
 
 
 def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
@@ -133,7 +135,31 @@ def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
                         st.session_state[deleting_key] = contrat_id
                         st.rerun()
 
+def render_delete_data(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
+    # ── Réinitialisation (visible uniquement si données perso) ────────────
+    if not df.empty:
+        st.subheader("Mes données", anchor=False)
 
+        with st.expander("Supprimer mes données"):
+            st.warning("Supprime définitivement toutes vos données. Irréversible !", icon=":material/warning:")
+            confirm_input = st.text_input(
+                "Tape **SUPPRIMER** pour confirmer",
+                placeholder="SUPPRIMER",
+                key="reset_confirm_input",
+            )
+            if st.button(
+                "Tout supprimer",
+                icon=":material/delete_forever:",
+                type="primary",
+                disabled=confirm_input != "SUPPRIMER",
+                use_container_width=True,
+                key="btn_reset_all",
+            ):
+                msg = reset_all_data()
+                flash_fn(msg, "success")
+                st.cache_data.clear()
+                invalidate_cache_fn()
+                st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
@@ -141,3 +167,8 @@ def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
 def render(df: pd.DataFrame, invalidate_cache_fn=None):
     # ── Section Contrats ─────────────────────────────────────────────────────
     _render_contrats(df, invalidate_cache_fn)
+    
+    st.divider()
+    
+    # ── Section Suppression données ──────────────────────────────────────────
+    render_delete_data(df, invalidate_cache_fn, st.toast)

@@ -18,7 +18,6 @@ from ui.tab_historique import render as render_historique
 from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog
 from ui.emprunt_form import render_emprunt_dialog
-from ui.sidebar import render as render_sidebar
 from constants import CATEGORIES_AUTO
 from datetime import datetime
 
@@ -93,11 +92,6 @@ def show_flash():
         f = st.session_state.pop("_flash")
         icons = {"success": "✅", "warning": "⚠️", "error": "❌", "info": "ℹ️"}
         st.toast(f["msg"], icon=icons.get(f["type"], "ℹ️"))
-
-
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-
-render_sidebar(df, invalidate_data_cache, flash)
 
 
 # ── Modales ───────────────────────────────────────────────────────────────────
