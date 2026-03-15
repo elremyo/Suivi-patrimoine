@@ -36,13 +36,24 @@ CATEGORY_COLOR_MAP = {
 }
 
 PLOTLY_LAYOUT = dict(
-    paper_bgcolor="#0F1117",
-    plot_bgcolor="#1A1D27",
-    font=dict(color="#E8EAF0", family="sans-serif"),
-    xaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
-    yaxis=dict(gridcolor="#2A2D3A", linecolor="#2A2D3A"),
-    margin=dict(l=0, r=0, t=0, b=0),
+    paper_bgcolor="#0A0B0E",
+    plot_bgcolor="#141519",
+    font=dict(color="#F9FAFB", family="Inter, system-ui, sans-serif"),
+    xaxis=dict(
+        gridcolor="#1F2937",
+        showgrid=False,
+        showline=False,
+        zeroline=False,
+        showticklabels=True,
+    ),    yaxis=dict(
+        gridcolor="#1F2937",
+        showgrid=True,
+        showline=False,
+        zeroline=False,
+        showticklabels=True,
+    ),    margin=dict(l=0, r=0, t=0, b=0),
     hovermode=False,
+    showlegend=False,
 )
 
 # ── Chemins des fichiers de données ──────────────────────────────────────────

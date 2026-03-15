@@ -112,8 +112,11 @@ def _render_chart(
 
     fig.update_layout(
         **PLOTLY_LAYOUT,
-        yaxis_title="Montant (€)", xaxis_title="Date",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
                     bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
+    )
+    fig.update_yaxes(
+        ticksuffix=" €",
+        tickformat=",.0f"
     )
     st.plotly_chart(fig, width="stretch", config={"staticPlot": True})

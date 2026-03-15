@@ -84,12 +84,13 @@ def render_price_chart(historical_data: pd.DataFrame, ticker: str, pru: float = 
     fig.update_layout(
         title=None,
         height=400,
-        showlegend=True,
         **PLOTLY_LAYOUT
     )
-    
-    fig.update_xaxes(title_text="Date")
-    fig.update_yaxes(title_text="Prix (€)")
+
+    fig.update_yaxes(
+        ticksuffix=" €",
+        tickformat=",.0f"
+    )
     
     st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
 

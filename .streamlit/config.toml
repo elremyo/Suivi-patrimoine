@@ -1,13 +1,50 @@
+[browser]
+gatherUsageStats = false
+
 [theme]
 base = "dark"
 
-# Couleur pricipale
-primaryColor = "#957FEF"
+# Palette de couleurs principale
+primaryColor = "#6366F1"
+backgroundColor = "#0A0B0E"
+secondaryBackgroundColor = "#141519"
+textColor = "#F9FAFB"
 
-# Fonds
-backgroundColor = "#0f1117"
-secondaryBackgroundColor = "#1A1D27"
+# Palette de couleurs étendue pour une meilleure visibilité
+redColor = "#EF4444"
+orangeColor = "#F97316"
+yellowColor = "#F59E0B"
+blueColor = "#3B82F6"
+greenColor = "#10B981"
+violetColor = "#8B5CF6"
+grayColor = "#6B7280"
 
-# Texte
-textColor = "#E8EAF0"
-font = "sans serif"
+# Typographie moderne et lisible
+font = "Inter, system-ui, sans-serif"
+headingFont = "Inter, system-ui, sans-serif"
+headingFontSizes = ["2.25rem", "1.875rem", "1.5rem", "1.25rem", "1.125rem", "1rem"]
+
+# Design system moderne
+baseRadius = "0.75rem"
+buttonRadius = "0.5rem"
+borderColor = "#2D3748"
+showWidgetBorder = true
+showSidebarBorder = true
+
+# Liens et interactivité
+linkColor = "#818CF8"
+linkUnderline = false
+
+# Dataframes et tables
+dataframeBorderColor = "#2D3748"
+dataframeHeaderBackgroundColor = "#1A1D27"
+# Palette graphique moderne
+chartCategoricalColors = [
+    "#6366F1", "#8B5CF6", "#EC4899", "#F43F5E", "#F97316",
+    "#F59E0B", "#10B981", "#14B8A6", "#06B6D4", "#3B82F6"
+]
+
+# Configuration sidebar spécifique
+[theme.sidebar]
+backgroundColor = "#0F1117"
+textColor = "#E5E7EB"
