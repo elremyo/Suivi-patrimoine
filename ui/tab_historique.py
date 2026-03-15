@@ -12,7 +12,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from services.historique import build_total_evolution, build_category_evolution
 from services.pricer import fetch_historical_prices
-from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT
+from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT, BENCHMARK_OPTIONS, BENCHMARK_COLOR
+
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
@@ -36,15 +37,28 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         st.info("Aucun historique disponible. Ajoute des actifs et mets à jour leurs montants pour construire un historique.")
         return
 
-    # Sélecteur de période format radio
-    period_label = st.radio(
-        "Période",
-        options=list(PERIOD_OPTIONS.keys()),
-        index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
-        horizontal=True,
-        key="period_selector",
-    )
+    # ── Sélecteurs ────────────────────────────────────────────────────────────
+    col_period, col_benchmark = st.columns([4, 2])
+
+    with col_period:
+        period_label = st.radio(
+            "Période",
+            options=list(PERIOD_OPTIONS.keys()),
+            index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
+            horizontal=True,
+            key="period_selector",
+        )
+
+    with col_benchmark:
+        benchmark_label = st.selectbox(
+            "Comparer avec",
+            options=list(BENCHMARK_OPTIONS.keys()),
+            index=0,
+            key="benchmark_selector",
+        )
+
     yf_period, nb_jours = PERIOD_OPTIONS[period_label]
+    benchmark_ticker = BENCHMARK_OPTIONS[benchmark_label]
 
     # Calcul de la date de début pour le filtre
     start_date = None
@@ -56,12 +70,19 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
         cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
 
+        # Récupération de l'indice de comparaison
+        df_benchmark = pd.DataFrame()
+        if benchmark_ticker:
+            df_benchmark = fetch_historical_prices((benchmark_ticker,), yf_period)
+
     # Filtrage par période
     if start_date is not None:
         if not total_evo.empty:
             total_evo = total_evo[total_evo["date"] >= start_date]
         if not cat_evo.empty:
             cat_evo = cat_evo[cat_evo.index >= start_date]
+        if not df_benchmark.empty:
+            df_benchmark = df_benchmark[df_benchmark.index >= start_date]
 
     # Sélecteur de séries
     options_total = ["Total patrimoine"]
@@ -79,7 +100,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         st.info("Sélectionne au moins une série à afficher.")
         return
 
-    _render_chart(selected, total_evo, cat_evo, options_cat)
+    _render_chart(selected, total_evo, cat_evo, options_cat, df_benchmark, benchmark_ticker, benchmark_label)
 
 
 def _render_chart(
@@ -87,13 +108,15 @@ def _render_chart(
     total_evo: pd.DataFrame,
     cat_evo: pd.DataFrame,
     options_cat: list[str],
+    df_benchmark: pd.DataFrame,
+    benchmark_ticker: str | None,
+    benchmark_label: str,
 ):
     """Construit et affiche le graphique Plotly des séries sélectionnées."""
     fig = go.Figure()
 
     for serie in selected:
         if serie == "Total patrimoine" and not total_evo.empty:
-            # Couleur neutre fixe pour le total
             fig.add_trace(go.Scatter(
                 x=total_evo["date"], y=total_evo["total"],
                 mode="lines+markers", name=serie,
@@ -101,7 +124,6 @@ def _render_chart(
                 marker=dict(size=5),
             ))
         elif serie in options_cat and not cat_evo.empty and serie in cat_evo.columns:
-            # Couleur fixe par catégorie
             color = CATEGORY_COLOR_MAP.get(serie, "#CCCCCC")
             fig.add_trace(go.Scatter(
                 x=cat_evo.index, y=cat_evo[serie],
@@ -109,6 +131,44 @@ def _render_chart(
                 line=dict(color=color, width=2),
                 marker=dict(size=5),
             ))
+
+    # ── Indice de comparaison ─────────────────────────────────────────────────
+    if (
+        benchmark_ticker
+        and not df_benchmark.empty
+        and benchmark_ticker in df_benchmark.columns
+        and not total_evo.empty
+        and "Total patrimoine" in selected
+    ):
+        bench_series = df_benchmark[benchmark_ticker].dropna()
+
+        if not bench_series.empty and not total_evo.empty:
+            total_evo_indexed = total_evo.set_index("date")["total"]
+
+            # Le benchmark ne commence pas avant la première donnée patrimoine
+            first_patrimoine_date = total_evo_indexed.index[0]
+            bench_series = bench_series[bench_series.index >= first_patrimoine_date]
+
+            if not bench_series.empty:
+                ref_bench = float(bench_series.iloc[0])
+
+                # Valeur patrimoine au point de départ du benchmark
+                candidates = total_evo_indexed[total_evo_indexed.index <= bench_series.index[0]]
+                if candidates.empty:
+                    candidates = total_evo_indexed
+                ref_patrimoine = float(candidates.iloc[-1])
+
+            # Recalage : l'indice démarre au niveau du patrimoine
+            if ref_bench > 0:
+                bench_scaled = bench_series * (ref_patrimoine / ref_bench)
+
+                fig.add_trace(go.Scatter(
+                    x=bench_scaled.index,
+                    y=bench_scaled.values,
+                    mode="lines",
+                    name=benchmark_label,
+                    line=dict(color=BENCHMARK_COLOR, width=2, dash="dot"),
+                ))
 
     fig.update_layout(
         **PLOTLY_LAYOUT,

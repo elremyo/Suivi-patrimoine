@@ -82,3 +82,17 @@ PERIOD_OPTIONS = {
 }
 
 PERIOD_DEFAULT = "3M"
+
+
+# ── Indices de comparaison disponibles ───────────────────────────────────────
+
+BENCHMARK_OPTIONS = {
+    "Aucun":       None,
+    "MSCI World":  "URTH",
+    "S&P 500":     "SPY",
+    "CAC 40":      "^FCHI",
+    "Bitcoin":     "BTC-USD",
+    "Ethereum":    "ETH-USD",
+}
+
+BENCHMARK_COLOR = "#F59E0B"  # jaune
