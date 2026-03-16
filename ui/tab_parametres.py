@@ -156,7 +156,7 @@ def render_delete_data(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
                 key="btn_reset_all",
             ):
                 msg = reset_all_data()
-                flash_fn(msg, "success")
+                flash_fn(msg)
                 st.cache_data.clear()
                 invalidate_cache_fn()
                 st.rerun()

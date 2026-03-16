@@ -174,7 +174,7 @@ def render(df: pd.DataFrame):
             st.markdown("### Bienvenue sur ton suivi de patrimoine 👋")
             st.markdown(" ")
             st.markdown("**1. Ajoute tes actifs**")
-            st.caption("Livrets, immobilier, actions, crypto, fonds euros — tous tes placements au même endroit.")
+            st.caption("Livrets, immobilier, actions, crypto, fonds euros : tous tes placements au même endroit !")
             st.markdown("**2. Les prix se mettent à jour automatiquement**")
             st.caption("Pour tes actions et cryptos, l'app récupère les cours en temps réel via Yahoo Finance.")
             st.markdown("**3. Suis l'évolution de ton patrimoine**")
