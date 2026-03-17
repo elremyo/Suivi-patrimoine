@@ -62,12 +62,39 @@ def _render_emprunt_row(row: pd.Series):
     )
 
 
+def _compute_interets_restants(row: pd.Series) -> float:
+    """Intérêts restant à payer = paiements futurs - capital restant dû."""
+    from datetime import date as date_type
+    crd = row.get("capital_restant_du") or 0.0
+    if not row.get("date_debut") or pd.isna(row["date_debut"]):
+        return 0.0
+    debut = pd.Timestamp(row["date_debut"]).date()
+    today = date_type.today()
+    months_elapsed = (today.year - debut.year) * 12 + (today.month - debut.month)
+    if debut.day > today.day:
+        months_elapsed -= 1
+    months_elapsed = max(0, min(months_elapsed, int(row["duree_mois"])))
+    months_remaining = int(row["duree_mois"]) - months_elapsed
+    return max(0.0, float(row["mensualite"]) * months_remaining - float(crd))
+
+
 def render(flash_fn) -> None:
     df = load_emprunts()
     total_crd = get_total_emprunts()
 
-    # ── Métrique + bouton sur la même ligne ───────────────────────────────────
-    st.metric(label="Total capital restant dû", value=f"{total_crd:,.2f} €")
+    # ── Métriques clés ─────────────────────────────────────────────────────────
+    total_mensualites = float(df["mensualite"].sum()) if not df.empty else 0.0
+    total_emprunte = float(df["montant_emprunte"].sum()) if not df.empty else 0.0
+    total_interets_restants = float(df.apply(_compute_interets_restants, axis=1).sum()) if not df.empty else 0.0
+
+    with st.container(horizontal=True):
+        st.metric("Total emprunté", f"{total_emprunte:,.0f} €", border=True)
+        st.metric("Mensualités / mois", f"{total_mensualites:,.0f} €", border=True)
+        st.metric("Capital restant dû", f"{total_crd:,.0f} €", border=True)
+        st.metric("Intérêts restants", f"{total_interets_restants:,.0f} €", border=True)
+
+    st.space(size="small")
+
     with st.container(horizontal=True, vertical_alignment="center"):
         st.write("")
         if st.button("Ajouter un emprunt", type="primary", key="btn_add_emprunt", icon=":material/add:"):
