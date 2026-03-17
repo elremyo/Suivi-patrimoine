@@ -111,6 +111,10 @@ with st.container(horizontal=True, vertical_alignment="bottom"):
     if st.button("Compléter mon patrimoine", key="complete_button", type="primary", icon=":material/add:"):
         set_dialog_create()
         st.rerun()
+
+##TODO : créer une modale commune entre actifs et passifs avec des tabs
+
+
 tab_synthese, tab_actifs, tab_passifs, tab_historique, tab_params = st.tabs([
     "Synthèse", "Actifs", "Passifs", "Historique", "Paramètres"
 ])
