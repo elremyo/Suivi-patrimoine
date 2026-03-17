@@ -12,7 +12,7 @@ from ui.emprunt_form import set_emprunt_dialog_create, set_emprunt_dialog_edit, 
 
 
 def _render_emprunt_row(row: pd.Series):
-    cols = st.columns([4, 2, 1.5, 2, 2, 0.5, 0.5])
+    cols = st.columns([4, 2, 1.5, 2, 2, 1.5, 0.5, 0.5])
 
     # Nom
     cols[0].write(row["nom"])
@@ -36,13 +36,30 @@ def _render_emprunt_row(row: pd.Series):
     else:
         cols[4].caption("—")
 
+    # % remboursé
+    montant_emprunte = float(row["montant_emprunte"])
+    if crd is not None and not (isinstance(crd, float) and pd.isna(crd)) and montant_emprunte > 0:
+        pct_rembourse = (montant_emprunte - float(crd)) / montant_emprunte * 100
+        cols[5].write(f"{pct_rembourse:.0f} %")
+    else:
+        cols[5].caption("—")
+
     # Actions
-    if cols[5].button("", key=f"emprunt_edit_{row['id']}", icon=":material/edit_square:", help="Modifier"):
+    if cols[6].button("", key=f"emprunt_edit_{row['id']}", icon=":material/edit_square:", help="Modifier"):
         set_emprunt_dialog_edit(row["id"])
         st.rerun()
-    if cols[6].button("", key=f"emprunt_del_{row['id']}", icon=":material/delete:", help="Supprimer"):
+    if cols[7].button("", key=f"emprunt_del_{row['id']}", icon=":material/delete:", help="Supprimer"):
         set_emprunt_dialog_delete(row["id"])
         st.rerun()
+
+    # Détail coût total sous la ligne principale
+    interets_totaux = row["mensualite"] * row["duree_mois"] - montant_emprunte # Ne prend pas en compte le taux d'intérêt car il est déjà inclus dans la mensualité
+    cout_total = montant_emprunte + interets_totaux
+    st.caption(
+        f"Emprunté {montant_emprunte:,.0f} € · "
+        f"Intérêts {interets_totaux:,.0f} € · "
+        f"Coût total {cout_total:,.0f} €"
+    )
 
 
 def render(flash_fn) -> None:
@@ -64,12 +81,13 @@ def render(flash_fn) -> None:
         return
 
     # ── En-tête des colonnes ──────────────────────────────────────────────────
-    header_cols = st.columns([4, 2, 1.5, 2, 2, 0.5, 0.5])
+    header_cols = st.columns([4, 2, 1.5, 2, 2, 1.5, 0.5, 0.5])
     header_cols[0].empty()
     header_cols[1].caption("Montant emprunté")
     header_cols[2].caption("Taux")
     header_cols[3].caption("Mensualité")
     header_cols[4].caption("Restant dû")
+    header_cols[5].caption("Remboursé")
 
     # ── Liste des emprunts ────────────────────────────────────────────────────
     for _, row in df.iterrows():
