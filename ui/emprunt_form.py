@@ -56,6 +56,14 @@ def _find_emprunt(emprunt_id: str) -> pd.Series:
         raise ValueError("Emprunt introuvable.")
     return row.iloc[0]
 
+def _format_duree(duree_mois: int) -> str:
+    ans = duree_mois // 12
+    mois = duree_mois % 12
+    if ans == 0:
+        return f"{mois} mois"
+    if mois == 0:
+        return f"{ans} ans"
+    return f"{ans} ans {mois} mois"
 
 # ── Formulaire (champs communs create / edit) ───────────────────────────────────
 
@@ -107,7 +115,7 @@ def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
         )
     with d2:
         #afficher la durée en années
-        st.caption(f"{duree_mois // 12} ans {duree_mois % 12} mois")
+        st.caption(_format_duree(duree_mois))
     with d3:
         date_debut_val = _date_to_str(edit_row["date_debut"]) if edit_row is not None else date.today().isoformat()
         date_debut = st.date_input(

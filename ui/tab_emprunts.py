@@ -8,17 +8,18 @@ import streamlit as st
 import pandas as pd
 
 from services.db_emprunts import load_emprunts, get_total_emprunts
-from ui.emprunt_form import set_emprunt_dialog_create, set_emprunt_dialog_edit, set_emprunt_dialog_delete
+from ui.emprunt_form import set_emprunt_dialog_create, set_emprunt_dialog_edit, set_emprunt_dialog_delete, _format_duree
 
 
 def _render_emprunt_row(row: pd.Series):
-    cols = st.columns([4, 2, 1.5, 2, 2, 1.5, 0.5, 0.5])
+    cols = st.columns([6, 3, 1, 2, 2, 2, 0.5, 0.5])
 
     # Nom
     cols[0].write(row["nom"])
     date_debut = row.get("date_debut")
     if date_debut is not None and not (isinstance(date_debut, float) and pd.isna(date_debut)):
-        cols[0].caption(f"Depuis {pd.Timestamp(date_debut).strftime('%b %Y')} · {row['duree_mois']} mois")
+        cols[0].caption(f"Depuis {pd.Timestamp(date_debut).strftime('%b %Y')} · {_format_duree(int(row['duree_mois']))}")
+
 
     # Montant emprunté
     cols[1].write(f"{row['montant_emprunte']:,.0f} €")
@@ -36,11 +37,11 @@ def _render_emprunt_row(row: pd.Series):
     else:
         cols[4].caption("—")
 
-    # % remboursé
+    # Remboursé
     montant_emprunte = float(row["montant_emprunte"])
     if crd is not None and not (isinstance(crd, float) and pd.isna(crd)) and montant_emprunte > 0:
-        pct_rembourse = (montant_emprunte - float(crd)) / montant_emprunte * 100
-        cols[5].write(f"{pct_rembourse:.0f} %")
+        capital_rembourse = montant_emprunte - float(crd)
+        cols[5].write(f"{capital_rembourse:,.0f} €")
     else:
         cols[5].caption("—")
 
@@ -52,14 +53,21 @@ def _render_emprunt_row(row: pd.Series):
         set_emprunt_dialog_delete(row["id"])
         st.rerun()
 
-    # Détail coût total sous la ligne principale
-    interets_totaux = row["mensualite"] * row["duree_mois"] - montant_emprunte # Ne prend pas en compte le taux d'intérêt car il est déjà inclus dans la mensualité
+# Barre de progression + détail coût total
+    interets_totaux = row["mensualite"] * row["duree_mois"] - montant_emprunte
     cout_total = montant_emprunte + interets_totaux
-    st.caption(
-        f"Emprunté {montant_emprunte:,.0f} € · "
-        f"Intérêts {interets_totaux:,.0f} € · "
-        f"Coût total {cout_total:,.0f} €"
-    )
+
+    if crd is not None and not (isinstance(crd, float) and pd.isna(crd)) and montant_emprunte > 0:
+        capital_rembourse = montant_emprunte - float(crd)
+        pct = capital_rembourse / montant_emprunte
+
+        with cols[0]:
+            with st.container(horizontal=True):
+                st.progress(value=pct)
+                st.caption(f"{pct*100:.0f}%")
+        with cols[1]:
+            st.caption(f"Intérêts {interets_totaux:,.0f} €")
+            st.caption(f"Coût total {cout_total:,.0f} €")
 
 
 def _compute_interets_restants(row: pd.Series) -> float:
@@ -127,7 +135,7 @@ def render(flash_fn) -> None:
         return
 
     # ── En-tête des colonnes ──────────────────────────────────────────────────
-    header_cols = st.columns([4, 2, 1.5, 2, 2, 1.5, 0.5, 0.5])
+    header_cols = st.columns([6, 3, 1, 2, 2, 2, 0.5, 0.5])
     header_cols[0].empty()
     header_cols[1].caption("Montant emprunté")
     header_cols[2].caption("Taux")
