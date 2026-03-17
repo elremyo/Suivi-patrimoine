@@ -165,22 +165,24 @@ def _render_profil(invalidate_cache_fn=None):
     from services.db_parametres import get_parametre, set_parametre
 
     with st.expander("Mon profil",icon = ":material/person:"):
-        revenu_actuel = get_parametre("revenu_mensuel_net")
-        revenu_val = float(revenu_actuel) if revenu_actuel else 0.0
+        with st.form("form_profil", border=False, enter_to_submit=False):
+            revenu_actuel = get_parametre("revenu_mensuel_net")
+            revenu_val = float(revenu_actuel) if revenu_actuel else 0.0
 
-        revenu = st.number_input(
-            "Revenu mensuel net (€)",
-            min_value=0.0,
-            value=revenu_val,
-            step=100.0,
-            key="param_revenu_mensuel",
-            help="Utilisé pour calculer ton taux d'endettement dans l'onglet Passifs. *Seuil bancaire habituel : 35 %*.",
-        )
+            revenu = st.number_input(
+                "Revenu mensuel net (€)",
+                min_value=0.0,
+                value=revenu_val,
+                step=100.0,
+                key="param_revenu_mensuel",
+                help="Utilisé pour calculer ton taux d'endettement dans l'onglet Passifs. *Seuil bancaire habituel : 35 %*.",
+            )
 
-        if st.button("Enregistrer", key="btn_save_revenu", type="primary"):
-            set_parametre("revenu_mensuel_net", revenu)
-            st.toast("Revenu enregistré.", icon="✅")
-            st.rerun()
+            submitted = st.form_submit_button("Enregistrer", type="primary")
+            if submitted:
+                set_parametre("revenu_mensuel_net", revenu)
+                st.toast("Revenu enregistré.", icon="✅")
+                st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
