@@ -16,7 +16,7 @@ from ui.tab_actifs import render as render_actifs
 from ui.tab_emprunts import render as render_emprunts
 from ui.tab_historique import render as render_historique
 from ui.tab_parametres import render as render_parametres
-from ui.asset_form import render_active_dialog
+from ui.asset_form import render_active_dialog, set_dialog_create
 from ui.emprunt_form import render_emprunt_dialog
 from constants import CATEGORIES_AUTO
 from datetime import datetime
@@ -106,8 +106,11 @@ show_flash()
 
 st.logo(image=":material/finance_mode:", size="large", icon_image=":material/finance_mode:")
 
-st.title("Suivi de patrimoine", anchor=False)
-
+with st.container(horizontal=True, vertical_alignment="bottom"):
+    st.title("Suivi de patrimoine", anchor=False)
+    if st.button("Compléter mon patrimoine", key="complete_button", type="primary", icon=":material/add:"):
+        set_dialog_create()
+        st.rerun()
 tab_synthese, tab_actifs, tab_passifs, tab_historique, tab_params = st.tabs([
     "Synthèse", "Actifs", "Passifs", "Historique", "Paramètres"
 ])

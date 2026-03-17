@@ -187,8 +187,8 @@ def render(df: pd.DataFrame):
 
     df_emprunts = load_emprunts()
     if not df_emprunts.empty:
-        st.divider()
+        st.space()
         _render_passifs(df_emprunts, total_actifs)
 
-    st.divider()
+    st.space()
     _render_contrats(df)

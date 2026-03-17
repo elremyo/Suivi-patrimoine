@@ -170,33 +170,27 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
     # ── Boutons d'action ──────────────────────────────────────────────────────
     with st.container(horizontal=True, vertical_alignment="center"):
         with st.container(horizontal=True, vertical_alignment="center"):
-            if st.button(
-                "",
-                icon=":material/refresh:",
-                disabled=not has_auto_assets,
-                help="Actualiser les prix",
-                key="btn_refresh_prices",
-                type="tertiary"
-            ):
-                with st.spinner("Récupération des prix…"):
-                    df, msg, msg_type = refresh_prices(df)
-                flash_fn(msg, msg_type)
-                st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
-                st.session_state["sync_error_tickers"] = set(
-                    msg.replace("Tickers introuvables : ", "").split(", ")
-                ) if msg_type == "warning" else set()
-                invalidate_cache_fn()
-                st.rerun()
-            if has_auto_assets and "sync_time" in st.session_state:
-                st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
-        if st.button(
-            "Compléter mon patrimoine",
-            icon=":material/add:",
-            type="primary",
-            key="btn_add_asset",
-        ):
-            set_dialog_create()
-            st.rerun()
+            if has_auto_assets:
+                if st.button(
+                    "",
+                    icon=":material/refresh:",
+                    disabled=not has_auto_assets,
+                    help="Actualiser les prix",
+                    key="btn_refresh_prices",
+                    type="tertiary"
+                ):
+                    with st.spinner("Récupération des prix…"):
+                        df, msg, msg_type = refresh_prices(df)
+                    flash_fn(msg, msg_type)
+                    st.session_state["sync_time"] = datetime.now().strftime("%H:%M")
+                    st.session_state["sync_error_tickers"] = set(
+                        msg.replace("Tickers introuvables : ", "").split(", ")
+                    ) if msg_type == "warning" else set()
+                    invalidate_cache_fn()
+                    st.rerun()
+                if "sync_time" in st.session_state:
+                    st.caption(f"Prix synchronisés à {st.session_state['sync_time']}")
+
 
     # ── Liste des actifs ──────────────────────────────────────────────────────
     if df.empty:
