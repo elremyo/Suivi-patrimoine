@@ -9,7 +9,63 @@ import pandas as pd
 
 from services.db_emprunts import load_emprunts, get_total_emprunts
 from ui.emprunt_form import set_emprunt_dialog_create, set_emprunt_dialog_edit, set_emprunt_dialog_delete, _format_duree
+import plotly.graph_objects as go
+from datetime import date
+from constants import PLOTLY_LAYOUT
 
+def _build_crd_evolution(df: pd.DataFrame) -> pd.DataFrame:
+    """Calcule le CRD total mois par mois jusqu'à extinction du dernier emprunt."""
+    from services.db_emprunts import _compute_capital_restant_du
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # Trouver la date de fin la plus lointaine
+    today = date.today().replace(day=1)
+    max_mois = int(df["duree_mois"].max())
+
+    rows = []
+    for i in range(max_mois + 1):
+        d = (pd.Timestamp(today) + pd.DateOffset(months=i)).date()
+        total = sum(
+            _compute_capital_restant_du(
+                row["montant_emprunte"],
+                row["taux_annuel"],
+                row["mensualite"],
+                row["date_debut"],
+                int(row["duree_mois"]),
+                as_of_date=d,
+            )
+            for _, row in df.iterrows()
+        )
+        rows.append({"date": d, "crd": total})
+        if total == 0.0:
+            break
+
+    return pd.DataFrame(rows)
+
+
+def _render_crd_chart(df: pd.DataFrame) -> None:
+    df_evo = _build_crd_evolution(df)
+    if df_evo.empty:
+        return
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_evo["date"],
+        y=df_evo["crd"],
+        mode="lines",
+        fill="tozeroy",
+        line=dict(color="#75cbd1", width=2),
+        fillcolor="rgba(117, 203, 209, 0.15)",
+    ))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        height=220,
+    )
+    
+    fig.update_yaxes(ticksuffix=" €", tickformat=",.0f")
+    st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
 
 def _render_emprunt_row(row: pd.Series):
     cols = st.columns([6, 3, 1, 2, 2, 2, 0.5, 0.5])
@@ -121,6 +177,10 @@ def render(flash_fn) -> None:
                 help="Renseigne ton revenu mensuel net dans Paramètres pour voir ce calcul."
             )
     st.space(size="small")
+
+    # ── Graphique évolution CRD ───────────────────────────────────────────────
+    if not df.empty:
+        _render_crd_chart(df)
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.write("")
