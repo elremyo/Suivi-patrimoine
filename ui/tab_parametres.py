@@ -140,7 +140,7 @@ def render_delete_data(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
     if not df.empty:
         st.subheader("Mes données", anchor=False)
 
-        with st.expander("Supprimer mes données"):
+        with st.expander("Supprimer mes données", icon = ":material/delete:"):
             st.warning("Supprime définitivement toutes vos données. Irréversible !", icon=":material/warning:")
             confirm_input = st.text_input(
                 "Tape **SUPPRIMER** pour confirmer",
@@ -161,10 +161,35 @@ def render_delete_data(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
                 invalidate_cache_fn()
                 st.rerun()
 
+def _render_profil(invalidate_cache_fn=None):
+    from services.db_parametres import get_parametre, set_parametre
+
+    with st.expander("Mon profil",icon = ":material/person:"):
+        revenu_actuel = get_parametre("revenu_mensuel_net")
+        revenu_val = float(revenu_actuel) if revenu_actuel else 0.0
+
+        revenu = st.number_input(
+            "Revenu mensuel net (€)",
+            min_value=0.0,
+            value=revenu_val,
+            step=100.0,
+            key="param_revenu_mensuel",
+            help="Utilisé pour calculer ton taux d'endettement dans l'onglet Passifs. *Seuil bancaire habituel : 35 %*.",
+        )
+
+        if st.button("Enregistrer", key="btn_save_revenu", type="primary"):
+            set_parametre("revenu_mensuel_net", revenu)
+            st.toast("Revenu enregistré.", icon="✅")
+            st.rerun()
+
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
-
 def render(df: pd.DataFrame, invalidate_cache_fn=None):
+    # ── Section Profil ───────────────────────────────────────────────────────
+    _render_profil()
+
+    st.divider()
+
     # ── Section Contrats ─────────────────────────────────────────────────────
     _render_contrats(df, invalidate_cache_fn)
     

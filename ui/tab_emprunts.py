@@ -82,17 +82,36 @@ def render(flash_fn) -> None:
     df = load_emprunts()
     total_crd = get_total_emprunts()
 
-    # ── Métriques clés ─────────────────────────────────────────────────────────
+# ── Métriques clés ─────────────────────────────────────────────────────────
     total_mensualites = float(df["mensualite"].sum()) if not df.empty else 0.0
     total_emprunte = float(df["montant_emprunte"].sum()) if not df.empty else 0.0
     total_interets_restants = float(df.apply(_compute_interets_restants, axis=1).sum()) if not df.empty else 0.0
+
+    from services.db_parametres import get_parametre
+    revenu = get_parametre("revenu_mensuel_net")
+    revenu_val = float(revenu) if revenu else None
+    taux_endettement = (total_mensualites / revenu_val * 100) if revenu_val and revenu_val > 0 else None
 
     with st.container(horizontal=True):
         st.metric("Total emprunté", f"{total_emprunte:,.0f} €", border=True)
         st.metric("Mensualités / mois", f"{total_mensualites:,.0f} €", border=True)
         st.metric("Capital restant dû", f"{total_crd:,.0f} €", border=True)
         st.metric("Intérêts restants", f"{total_interets_restants:,.0f} €", border=True)
-
+        if taux_endettement is not None:
+            alerte = ":red[:material/error:]" if taux_endettement > 35 else ":orange[:material/warning:]" if taux_endettement > 30 else ":green[:material/check_circle:]"
+            st.metric(
+                "Taux d'endettement",
+                f"{alerte} {taux_endettement:.1f} %",
+                border=True,
+                help="Mensualités ÷ revenus nets. Seuil bancaire : 35 %."
+            )
+        else:
+            st.metric(
+                "Taux d'endettement",
+                "?",
+                border=True,
+                help="Renseigne ton revenu mensuel net dans Paramètres pour voir ce calcul."
+            )
     st.space(size="small")
 
     with st.container(horizontal=True, vertical_alignment="center"):

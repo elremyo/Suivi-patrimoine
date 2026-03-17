@@ -78,11 +78,20 @@ def init_db() -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Applique les migrations incrémentales sur une base existante."""
-    # Ajout de contrat_id dans actifs si absent (base existante avant cette feature)
+    # Migration 1 — contrat_id dans actifs
     cols = [row[1] for row in conn.execute("PRAGMA table_info(actifs)").fetchall()]
     if "contrat_id" not in cols:
         conn.execute("ALTER TABLE actifs ADD COLUMN contrat_id TEXT REFERENCES contrats(id) ON DELETE SET NULL")
         conn.commit()
+
+    # Migration 2 — table parametres (clé/valeur)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS parametres (
+            cle   TEXT PRIMARY KEY,
+            valeur TEXT NOT NULL
+        )
+    """)
+    conn.commit()
 
 
 def reset_all_data() -> str:
