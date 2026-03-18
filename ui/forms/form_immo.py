@@ -46,15 +46,14 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
     if type_bien_val not in TYPE_BIEN_OPTIONS:
         type_bien_val = "autre"
 
-
-
     col_type, col_montant = st.columns(2)
     
     with col_type:
         type_bien = st.selectbox(
         "Type de bien",
-        options=TYPE_BIEN_OPTIONS,
-        index=TYPE_BIEN_OPTIONS.index(type_bien_val),
+        options=list(TYPE_BIEN_OPTIONS.keys()),
+        format_func=lambda x: TYPE_BIEN_OPTIONS[x],
+        index=list(TYPE_BIEN_OPTIONS.keys()).index(type_bien_val),
         key="_form_type_bien",
     )
     with col_montant:

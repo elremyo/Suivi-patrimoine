@@ -7,6 +7,7 @@ Accessible uniquement pour les actifs automatiques (Actions & Fonds, Crypto).
 """
 
 import streamlit as st
+from constants import TYPE_BIEN_OPTIONS
 import pandas as pd
 import plotly.graph_objects as go
 import yfinance as yf
@@ -185,9 +186,10 @@ def _render_immo_detail(asset: pd.Series):
     st.subheader("Identité du bien", anchor=False)
     with st.container(border=True):
         c1, c2, c3, c4 = st.columns(4)
-        type_bien = str(asset.get("type_bien") or "—").capitalize()
+        type_bien_key = str(asset.get("type_bien") or "autre").strip().lower()
+        type_bien_display = TYPE_BIEN_OPTIONS.get(type_bien_key, str(asset.get("type_bien") or "—").capitalize())
         c1.caption("Type")
-        c1.markdown(f"{type_bien}")
+        c1.markdown(f"{type_bien_display}")
 
         superficie = asset.get("superficie_m2")
         c2.caption("Superficie")

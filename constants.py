@@ -23,7 +23,14 @@ ENVELOPPES = [
 ]
 
 # Types de biens immobiliers (pour le détail immobilier)
-TYPE_BIEN_OPTIONS = ["appartement", "maison", "terrain", "local_commercial", "autre"]
+TYPE_BIEN_OPTIONS = {
+    "appartement": "Appartement",
+    "maison": "Maison",
+    "terrain": "Terrain",
+    "local_commercial": "Local commercial",
+    "parking": "Parking",
+    "autre": "Autre"
+}
 
 # Couleur fixe par catégorie
 CATEGORY_COLOR_MAP = {

@@ -8,6 +8,7 @@ Les téléchargements et la réinitialisation sont dans ui/sidebar.py.
 """
 
 import streamlit as st
+from constants import TYPE_BIEN_OPTIONS
 import pandas as pd
 from datetime import datetime
 from services.asset_manager import refresh_prices
@@ -88,7 +89,9 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         if row["categorie"] == "Immobilier":
             immo_parts = []
             if row.get("type_bien") and str(row.get("type_bien")).strip() and str(row.get("type_bien")) != "autre":
-                immo_parts.append(str(row.get("type_bien")).strip())
+                type_bien_key = str(row.get("type_bien")).strip().lower()
+                type_bien_display = TYPE_BIEN_OPTIONS.get(type_bien_key, str(row.get("type_bien")).strip())
+                immo_parts.append(type_bien_display)
             if row.get("superficie_m2") and float(row.get("superficie_m2", 0) or 0) > 0:
                 immo_parts.append(f"{float(row['superficie_m2']):.0f} m²")
             if immo_parts:
