@@ -22,8 +22,7 @@ ASSETS_FLAT_COLUMNS = [
     "id", "nom", "categorie", "montant", "ticker", "quantite", "pru",
     "contrat_id",
 ]
-IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2"]
-
+IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2", "frais_notaire", "montant_travaux", "usage"]
 
 def load_assets() -> pd.DataFrame:
     """
@@ -42,7 +41,7 @@ def load_assets() -> pd.DataFrame:
         """
         df = pd.read_sql_query(q, conn)
 
-        q_immo = "SELECT actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2 FROM actifs_immobilier"
+        q_immo = "SELECT actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, COALESCE(frais_notaire, 0) AS frais_notaire, COALESCE(montant_travaux, 0) AS montant_travaux, COALESCE(usage, 'locatif') AS usage FROM actifs_immobilier"
         try:
             df_immo = pd.read_sql_query(q_immo, conn)
         except pd.errors.DatabaseError:
@@ -56,7 +55,7 @@ def load_assets() -> pd.DataFrame:
         df = df.merge(df_immo, left_on="id", right_on="actif_id", how="left", suffixes=("", "_immo"))
         if "actif_id" in df.columns:
             df = df.drop(columns=["actif_id"])
-        for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id"]:
+        for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id", "frais_notaire", "montant_travaux", "usage"]:
             if col not in df.columns:
                 df[col] = None
 
@@ -129,18 +128,28 @@ def save_assets(df: pd.DataFrame) -> None:
                 adresse = str(adresse) if adresse is not None and not pd.isna(adresse) else None
                 superficie = row.get("superficie_m2")
                 superficie = float(superficie) if superficie is not None and not pd.isna(superficie) else None
+                frais_notaire = row.get("frais_notaire")
+                frais_notaire = float(frais_notaire) if frais_notaire is not None and not pd.isna(frais_notaire) else 0.0
+                montant_travaux = row.get("montant_travaux")
+                montant_travaux = float(montant_travaux) if montant_travaux is not None and not pd.isna(montant_travaux) else 0.0
+                usage = row.get("usage")
+                usage = str(usage) if usage in ("residence_principale", "locatif") else "locatif"
+
                 conn.execute(
                     """
-                    INSERT INTO actifs_immobilier (actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO actifs_immobilier (actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, frais_notaire, montant_travaux, usage)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(actif_id) DO UPDATE SET
                         prix_achat = excluded.prix_achat,
                         emprunt_id = excluded.emprunt_id,
                         type_bien = excluded.type_bien,
                         adresse = excluded.adresse,
-                        superficie_m2 = excluded.superficie_m2
+                        superficie_m2 = excluded.superficie_m2,
+                        frais_notaire = excluded.frais_notaire,
+                        montant_travaux = excluded.montant_travaux,
+                        usage = excluded.usage
                     """,
-                    (aid, prix_achat, emprunt_id, type_bien, adresse, superficie),
+                    (aid, prix_achat, emprunt_id, type_bien, adresse, superficie, frais_notaire, montant_travaux, usage),
                 )
             else:
                 conn.execute("DELETE FROM actifs_immobilier WHERE actif_id = ?", (aid,))

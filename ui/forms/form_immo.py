@@ -38,7 +38,18 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         index=TYPE_BIEN_OPTIONS.index(type_bien_val),
         key="_form_type_bien",
     )
-
+    usage_options = {"locatif": "Locatif", "residence_principale": "Résidence principale"}
+    usage_val = str(row.get("usage") or "locatif") if mode == "edit" else "locatif"
+    if usage_val not in usage_options:
+        usage_val = "locatif"
+    usage = st.radio(
+        "Usage du bien",
+        options=list(usage_options.keys()),
+        format_func=lambda x: usage_options[x],
+        index=list(usage_options.keys()).index(usage_val),
+        horizontal=True,
+        key="_form_usage",
+    )
     prix_achat = st.number_input(
         "Prix d'achat (€)",
         min_value=0.0,
@@ -59,6 +70,29 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         step=5.0,
         key="_form_superficie",
     )
+
+    st.markdown("**Coût d'acquisition**")
+    col_notaire, col_travaux = st.columns(2)
+    with col_notaire:
+        frais_notaire = st.number_input(
+            "Frais de notaire (€)",
+            min_value=0.0,
+            value=float(row.get("frais_notaire") or 0.0) if mode == "edit" else 0.0,
+            step=500.0,
+            key="_form_frais_notaire",
+        )
+    with col_travaux:
+        montant_travaux = st.number_input(
+            "Travaux (€)",
+            min_value=0.0,
+            value=float(row.get("montant_travaux") or 0.0) if mode == "edit" else 0.0,
+            step=500.0,
+            key="_form_montant_travaux",
+        )
+    cout_reel = prix_achat + frais_notaire + montant_travaux
+    if cout_reel > prix_achat:
+        st.caption(f":material/calculate: Coût réel d'acquisition : **{cout_reel:,.0f} €**")
+
 
     # ── Emprunt lié ──────────────────────────────────────────────────────────
     df_emprunts = load_emprunts()
@@ -84,11 +118,14 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
     emprunt_id = None if emprunt_choice == "Aucun" else df_emprunts.iloc[emprunt_options.index(emprunt_choice) - 1]["id"]
 
     immo_params = {
-        "prix_achat":    prix_achat,
-        "type_bien":     type_bien,
-        "adresse":       adresse.strip() or None,
-        "superficie_m2": superficie if superficie > 0 else None,
-        "emprunt_id":    emprunt_id,
+        "prix_achat": prix_achat,
+        "type_bien": type_bien,
+        "adresse": adresse,
+        "superficie_m2": superficie,
+        "emprunt_id": emprunt_id,
+        "frais_notaire": frais_notaire,
+        "montant_travaux": montant_travaux,
+        "usage": usage,
     }
 
     c1, c2 = st.columns(2)
