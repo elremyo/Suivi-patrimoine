@@ -186,12 +186,17 @@ def _render_immo_detail(asset: pd.Series):
     with st.container(border=True):
         c1, c2, c3, c4 = st.columns(4)
         type_bien = str(asset.get("type_bien") or "—").capitalize()
-        c1.metric("Type", type_bien)
+        c1.caption("Type")
+        c1.markdown(f"{type_bien}")
+
         superficie = asset.get("superficie_m2")
-        c2.metric("Superficie", f"{float(superficie):.0f} m²" if superficie and float(superficie) > 0 else "—")
-        c3.metric("Usage", usage_label)
+        c2.caption("Superficie")
+        c2.markdown(f"{float(superficie):.0f} m²" if superficie and float(superficie) > 0 else "—")
+        c3.caption("Usage")
+        c3.markdown(usage_label)
         adresse = str(asset.get("adresse") or "—").strip()
-        c4.metric("Adresse", adresse if adresse else "—")
+        c4.caption("Adresse")
+        c4.markdown(adresse if adresse else "—")
 
     st.space(size="small")
 
@@ -207,14 +212,19 @@ def _render_immo_detail(asset: pd.Series):
         pv_pct = (plus_value / cout_reel * 100) if cout_reel > 0 else 0
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Valeur actuelle", f"{valeur_actuelle:,.0f} €")
-        c2.metric("Prix d'achat", f"{prix_achat:,.0f} €")
+        c1.caption("Valeur actuelle")
+        c1.markdown(f"{valeur_actuelle:,.0f} €")
+        c2.caption("Prix d'achat")
+        c2.markdown(f"{prix_achat:,.0f} €")
         notaire_str = f"dont {frais_notaire:,.0f} € notaire" if frais_notaire > 0 else ""
         travaux_str = f"+ {montant_travaux:,.0f} € travaux" if montant_travaux > 0 else ""
         detail_cout = " · ".join(filter(None, [notaire_str, travaux_str]))
-        c3.metric("Coût réel", f"{cout_reel:,.0f} €", help=detail_cout if detail_cout else None)
+        c3.caption("Coût réel")
+        c3.markdown(f"{cout_reel:,.0f} €", help=detail_cout if detail_cout else None)
         sign = "+" if plus_value >= 0 else ""
-        c4.metric("Plus-value latente", f"{sign}{plus_value:,.0f} €", delta=f"{sign}{pv_pct:.1f} %")
+        color = "green" if plus_value >= 0 else "red"
+        c4.caption("Plus-value latente")
+        c4.markdown(f"{sign}{plus_value:,.0f} € :{color}-background[{sign}{pv_pct:.1f} %]")
 
     st.space(size="small")
 
@@ -233,10 +243,14 @@ def _render_immo_detail(asset: pd.Series):
                 taux = float(e.get("taux_annuel") or 0)
                 date_fin = e.get("date_fin")
                 date_fin_str = pd.Timestamp(date_fin).strftime("%m/%Y") if date_fin and not pd.isna(date_fin) else "—"
-                c1.metric("Capital restant dû", f"{crd:,.0f} €")
-                c2.metric("Mensualité", f"{mensualite:,.0f} €/mois")
-                c3.metric("Taux annuel", f"{taux:.2f} %")
-                c4.metric("Fin prévue", date_fin_str)
+                c1.caption("Capital restant dû")
+                c1.markdown(f"{crd:,.0f} €")
+                c2.caption("Mensualité")
+                c2.markdown(f"{mensualite:,.0f} €/mois")
+                c3.caption("Taux annuel")
+                c3.markdown(f"{taux:.2f} %")
+                c4.caption("Fin prévue")
+                c4.markdown(date_fin_str)
             st.space(size="small")
 
     # ── Bloc 4 : Rendement locatif ────────────────────────────────────────────
@@ -248,16 +262,20 @@ def _render_immo_detail(asset: pd.Series):
         st.subheader("Rendement locatif", anchor=False)
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
-            c1.metric("Loyer mensuel brut", f"{loyer:,.0f} €" if loyer > 0 else "—")
-            c2.metric("Charges mensuelles", f"{charges:,.0f} €" if charges > 0 else "—")
-            c3.metric("Taxe foncière", f"{taxe:,.0f} €/an" if taxe > 0 else "—")
+            c1.caption("Loyer mensuel brut")
+            c1.markdown(f"{loyer:,.0f} €" if loyer > 0 else "—")
+            c2.caption("Charges mensuelles")
+            c2.markdown(f"{charges:,.0f} €" if charges > 0 else "—")
+            c3.caption("Taxe foncière")
+            c3.markdown(f"{taxe:,.0f} €/an" if taxe > 0 else "—")
 
             if loyer > 0:
                 st.divider()
                 c1, c2 = st.columns(2)
                 if cout_reel > 0:
                     rendement_brut = loyer * 12 / cout_reel * 100
-                    c1.metric("Rendement brut", f"{rendement_brut:.2f} %", help="Loyer annuel ÷ coût réel d'acquisition")
+                    c1.caption("Rendement brut", help="Loyer annuel ÷ coût réel d'acquisition")
+                    c1.markdown(f"{rendement_brut:.2f} %")
                 mensualite_emp = 0.0
                 if emprunt_id and not pd.isna(emprunt_id):
                     df_emprunts = load_emprunts()
@@ -266,7 +284,9 @@ def _render_immo_detail(asset: pd.Series):
                         mensualite_emp = float(emp.iloc[0]["mensualite"])
                 cashflow = loyer - charges - taxe / 12 - mensualite_emp
                 sign = "+" if cashflow >= 0 else ""
-                c2.metric("Cashflow mensuel", f"{sign}{cashflow:,.0f} €", delta=f"{sign}{cashflow:,.0f} €")
+                color = "green" if cashflow >= 0 else "red"
+                c2.caption("Cashflow mensuel")
+                c2.markdown(f":{color}-background[{sign}{cashflow:,.0f} €]")
 
 
 
