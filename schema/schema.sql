@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS emprunts (
 CREATE TABLE IF NOT EXISTS actifs_immobilier (
   actif_id TEXT PRIMARY KEY REFERENCES actifs(id) ON DELETE CASCADE,
   prix_achat REAL NOT NULL,
+  date_achat TEXT,
   emprunt_id TEXT REFERENCES emprunts(id) ON DELETE SET NULL,
   type_bien TEXT NOT NULL,
   adresse TEXT,

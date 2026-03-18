@@ -9,6 +9,7 @@ Point d'entrée : render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn)
 """
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from services.asset_manager import create_manual_asset, edit_manual_asset
 from services.db_emprunts import load_emprunts
 from ui.forms._shared import close_dialog
@@ -26,9 +27,8 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
     if usage_val not in usage_options:
         usage_val = "residence_principale"
 
-    col_nom, col_usage = st.columns(2)
-    with col_nom:
-        nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
+    nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
+    col_usage, col_date = st.columns(2)
     with col_usage:
         usage = st.radio(
         "Usage du bien",
@@ -38,9 +38,14 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         horizontal=True,
         key="_form_usage",
     )
-    
-
-    st.markdown("**Détail immobilier**")
+    with col_date:
+        # Récupérer la date d'achat existante ou utiliser la date du jour par défaut
+        date_achat_value = str(row.get("date_achat") or datetime.now().strftime("%Y-%m-%d")) if mode == "edit" else datetime.now().strftime("%Y-%m-%d")
+        date_achat = st.date_input(
+            "Date d'achat",
+            value=datetime.strptime(date_achat_value, "%Y-%m-%d").date() if date_achat_value else datetime.now().date(),
+            key="_form_date_achat",
+        )
 
     type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "autre"
     if type_bien_val not in TYPE_BIEN_OPTIONS:
@@ -82,6 +87,14 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         value=str(row.get("adresse") or "").strip() if mode == "edit" else "",
         placeholder="Optionnel",
         key="_form_adresse",
+    )
+
+    # ── Notes ──────────────────────────────────────────────────────────────────
+    notes = st.text_area(
+        "Notes",
+        value=str(row.get("notes") or "").strip() if mode == "edit" else "",
+        placeholder="Optionnel : remarques, détails, etc.",
+        key="_form_notes",
     )
 
 
@@ -180,6 +193,8 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         "loyer_mensuel": loyer_mensuel,
         "charges_mensuelles": charges_mensuelles,
         "taxe_fonciere_annuelle": taxe_fonciere_annuelle,
+        "date_achat": date_achat.strftime("%Y-%m-%d"),
+        "notes": notes,
     }
 
     c1, c2 = st.columns(2)

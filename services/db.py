@@ -114,6 +114,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE emprunts DROP COLUMN date_fin")
         conn.commit()
 
+    # Migration 6 — date_achat dans actifs_immobilier
+    immo_cols = [row[1] for row in conn.execute("PRAGMA table_info(actifs_immobilier)").fetchall()]
+    if "date_achat" not in immo_cols:
+        conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN date_achat TEXT")
+        conn.commit()
+
 
 def reset_all_data() -> str:
     """Supprime la base locale pour repartir de zéro."""
