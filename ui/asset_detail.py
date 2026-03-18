@@ -177,12 +177,12 @@ def _render_immo_detail(asset: pd.Series):
                 del st.session_state["_asset_detail"]
             st.rerun()
         usage_label = "Résidence principale" if asset.get("usage") == "residence_principale" else "Locatif"
-        st.subheader(f"{asset['nom']}", anchor=False)
-
+        st.header(f"{asset['nom']}", anchor=False)
+    
     st.divider()
 
     # ── Bloc 1 : Identité ─────────────────────────────────────────────────────
-    st.markdown("#### Identité du bien")
+    st.subheader("Identité du bien", anchor=False)
     with st.container(border=True):
         c1, c2, c3, c4 = st.columns(4)
         type_bien = str(asset.get("type_bien") or "—").capitalize()
@@ -196,7 +196,7 @@ def _render_immo_detail(asset: pd.Series):
     st.space(size="small")
 
     # ── Bloc 2 : Valorisation ─────────────────────────────────────────────────
-    st.markdown("#### Valorisation")
+    st.subheader("Valorisation", anchor=False)
     with st.container(border=True):
         valeur_actuelle = float(asset.get("montant") or 0)
         prix_achat = float(asset.get("prix_achat") or 0)
@@ -225,7 +225,7 @@ def _render_immo_detail(asset: pd.Series):
         emp = df_emprunts[df_emprunts["id"] == str(emprunt_id)]
         if not emp.empty:
             e = emp.iloc[0]
-            st.markdown("#### Emprunt lié")
+            st.subheader("Emprunt lié", anchor=False)
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns(4)
                 crd = float(e.get("capital_restant_du") or 0)
@@ -245,7 +245,7 @@ def _render_immo_detail(asset: pd.Series):
         charges = float(asset.get("charges_mensuelles") or 0)
         taxe = float(asset.get("taxe_fonciere_annuelle") or 0)
 
-        st.markdown("#### Rendement locatif")
+        st.subheader("Rendement locatif", anchor=False)
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
             c1.metric("Loyer mensuel brut", f"{loyer:,.0f} €" if loyer > 0 else "—")
@@ -254,7 +254,7 @@ def _render_immo_detail(asset: pd.Series):
 
             if loyer > 0:
                 st.divider()
-                c1, c2, c3 = st.columns(3)
+                c1, c2 = st.columns(2)
                 if cout_reel > 0:
                     rendement_brut = loyer * 12 / cout_reel * 100
                     c1.metric("Rendement brut", f"{rendement_brut:.2f} %", help="Loyer annuel ÷ coût réel d'acquisition")
@@ -267,9 +267,7 @@ def _render_immo_detail(asset: pd.Series):
                 cashflow = loyer - charges - taxe / 12 - mensualite_emp
                 sign = "+" if cashflow >= 0 else ""
                 c2.metric("Cashflow mensuel", f"{sign}{cashflow:,.0f} €", delta=f"{sign}{cashflow:,.0f} €")
-                if mensualite_emp > 0:
-                    effort = mensualite_emp - (loyer - charges - taxe / 12)
-                    c3.metric("Effort d'épargne", f"{effort:,.0f} €/mois", help="Ce que tu débourses chaque mois au-delà du loyer perçu")
+
 
 
 def render_asset_detail(asset_id: str, df: pd.DataFrame):
@@ -304,7 +302,7 @@ def render_asset_detail(asset_id: str, df: pd.DataFrame):
                 del st.session_state["_asset_detail"]
             st.rerun()
     
-        st.subheader(f"{asset['nom']}", anchor=False)
+        st.header(f"{asset['nom']}", anchor=False)
 
     st.divider()
     

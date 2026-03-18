@@ -52,13 +52,17 @@ def load_emprunts(as_of_date: date | None = None) -> pd.DataFrame:
     """Charge tous les emprunts avec calcul du capital restant dû."""
     with db_readonly() as conn:
         df = pd.read_sql_query(
-            """SELECT id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin
+            """SELECT id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut
                FROM emprunts ORDER BY nom""",
             conn,
         )
         if not df.empty:
             df["date_debut"] = pd.to_datetime(df["date_debut"], errors="coerce")
-            df["date_fin"] = pd.to_datetime(df["date_fin"], errors="coerce")
+            df["date_fin"] = df.apply(
+                lambda r: r["date_debut"] + pd.DateOffset(months=int(r["duree_mois"]))
+                if pd.notna(r["date_debut"]) else pd.NaT,
+                axis=1,
+            )
             as_of = as_of_date or date.today()
             for i in df.index:
                 try:
@@ -75,29 +79,27 @@ def load_emprunts(as_of_date: date | None = None) -> pd.DataFrame:
         return df
 
 
-def create_emprunt(nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin=None) -> str:
+def create_emprunt(nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut) -> str:
     """Crée un nouvel emprunt."""
     emprunt_id = str(uuid.uuid4())
     with db_connection() as conn:
         conn.execute(
-            """INSERT INTO emprunts (id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO emprunts (id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (emprunt_id, nom.strip(), float(montant_emprunte), float(taux_annuel), float(mensualite), int(duree_mois),
-             date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
-             date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d"))),
+             date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d")),
         )
     return emprunt_id
 
 
-def update_emprunt(emprunt_id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut, date_fin=None) -> None:
+def update_emprunt(emprunt_id, nom, montant_emprunte, taux_annuel, mensualite, duree_mois, date_debut) -> None:
     """Met à jour un emprunt existant."""
     with db_connection() as conn:
         conn.execute(
             """UPDATE emprunts SET nom = ?, montant_emprunte = ?, taux_annuel = ?, mensualite = ?, duree_mois = ?,
-               date_debut = ?, date_fin = ?, updated_at = datetime('now') WHERE id = ?""",
+               date_debut = ?, updated_at = datetime('now') WHERE id = ?""",
             (nom.strip(), float(montant_emprunte), float(taux_annuel), float(mensualite), int(duree_mois),
              date_debut if isinstance(date_debut, str) else pd.Timestamp(date_debut).strftime("%Y-%m-%d"),
-             date_fin if date_fin is None or (isinstance(date_fin, str) and not date_fin.strip()) else (date_fin if isinstance(date_fin, str) else pd.Timestamp(date_fin).strftime("%Y-%m-%d")),
              emprunt_id),
         )
 

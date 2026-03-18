@@ -75,7 +75,9 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
                 key=f"detail_{row['id']}",
                 help="Voir le détail de ce bien",
                 type="tertiary",
-                icon=":material/home:",
+                icon=":material/article:",
+                icon_position="right",
+
             ):
                 set_asset_detail(row["id"])
                 st.rerun()
@@ -89,10 +91,6 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
                 immo_parts.append(str(row.get("type_bien")).strip())
             if row.get("superficie_m2") and float(row.get("superficie_m2", 0) or 0) > 0:
                 immo_parts.append(f"{float(row['superficie_m2']):.0f} m²")
-            if row.get("adresse") and str(row.get("adresse")).strip():
-                immo_parts.append(str(row.get("adresse")).strip())
-            if row.get("usage") == "residence_principale":
-                immo_parts.append("Résidence principale")
             if immo_parts:
                 cols[0].caption(" · ".join(immo_parts))
 
@@ -116,15 +114,12 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
                 loc_parts = []
                 if loyer > 0 and cout_reel > 0:
                     rendement_brut = loyer * 12 / cout_reel * 100
-                    loc_parts.append(f":material/percent: {rendement_brut:.1f} % brut")
+                    loc_parts.append(f"{rendement_brut:.1f} % brut")
                 if loyer > 0:
                     cashflow = loyer - charges - taxe / 12 - mensualite
                     sign = "+" if cashflow >= 0 else ""
                     color = "green" if cashflow >= 0 else "red"
                     loc_parts.append(f"Cashflow : :{color}[**{sign}{cashflow:.0f} €/m**]")
-                    if mensualite > 0:
-                        effort = mensualite - (loyer - charges - taxe / 12)
-                        loc_parts.append(f"Effort : {effort:.0f} €/m")
                 if loc_parts:
                     cols[0].caption(" · ".join(loc_parts))
 

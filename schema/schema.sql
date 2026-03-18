@@ -52,7 +52,6 @@ CREATE TABLE IF NOT EXISTS emprunts (
   mensualite REAL NOT NULL,
   duree_mois INTEGER NOT NULL,
   date_debut TEXT NOT NULL,
-  date_fin TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
