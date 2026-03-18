@@ -1,45 +1,48 @@
 """
 ui/asset_form.py
 ─────────────────
-Modale unique pour la création, l'édition et la suppression d'un actif.
-+ Modale légère "Mettre à jour" pour enregistrer un état à une date donnée.
-
-Gestion du session state :
-- Une seule clé `_dialog` centralise ce qui doit être affiché :
-    {"type": "create"}
-    {"type": "edit",   "asset_id": "..."}
-    {"type": "delete", "asset_id": "..."}
-    {"type": "update", "asset_id": "..."}
-- Toute ouverture écrase la précédente → impossible d'avoir deux modales.
-- Toute fermeture (save/cancel) supprime `_dialog` avant st.rerun().
+Coordinateur des modales actifs.
+Ce fichier gère uniquement :
+  - l'état du session_state (_dialog)
+  - les décorateurs @st.dialog (obligatoirement ici, Streamlit l'exige)
+  - le dispatch vers les formulaires dédiés dans ui/forms/
 
 Points d'entrée publics :
-    set_dialog_create()
+    set_dialog_create(categorie)
     set_dialog_edit(asset_id)
     set_dialog_delete(asset_id)
     set_dialog_update(asset_id)
     render_active_dialog(df, invalidate_cache_fn, flash_fn)
 """
-
 import streamlit as st
 import pandas as pd
-from services.asset_manager import (
-    create_auto_asset,
-    create_manual_asset,
-    edit_auto_asset,
-    edit_manual_asset,
-    remove_asset,
-    update_at_date,
-)
-from services.pricer import validate_ticker, lookup_ticker
-from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, ENVELOPPES, TYPE_BIEN_OPTIONS
-from services.db_emprunts import load_emprunts
+from datetime import date
+
+from services.asset_manager import remove_asset, update_at_date
+from constants import CATEGORIES_AUTO
+
+from ui.forms._shared import close_dialog
+import ui.forms.form_ticker      as _f_ticker
+import ui.forms.form_livret      as _f_livret
+import ui.forms.form_immo        as _f_immo
+import ui.forms.form_fonds_euros as _f_fonds_euros
 
 
-# ── Gestion de l'état des modales ─────────────────────────────────────────────
+# ── Mapping catégorie → module formulaire ─────────────────────────────────────
 
-def set_dialog_create():
-    st.session_state["_dialog"] = {"type": "create"}
+_FORM_MAP = {
+    "Actions & Fonds": _f_ticker,
+    "Crypto":          _f_ticker,
+    "Livrets":         _f_livret,
+    "Immobilier":      _f_immo,
+    "Fonds euros":     _f_fonds_euros,
+}
+
+
+# ── Gestion de l'état ─────────────────────────────────────────────────────────
+
+def set_dialog_create(categorie: str):
+    st.session_state["_dialog"] = {"type": "create", "categorie": categorie}
 
 def set_dialog_edit(asset_id: str):
     st.session_state["_dialog"] = {"type": "edit", "asset_id": asset_id}
@@ -49,13 +52,6 @@ def set_dialog_delete(asset_id: str):
 
 def set_dialog_update(asset_id: str):
     st.session_state["_dialog"] = {"type": "update", "asset_id": asset_id}
-
-def _close_dialog():
-    """Ferme la modale et nettoie tout l'état du formulaire."""
-    st.session_state.pop("_dialog", None)
-    for key in list(st.session_state.keys()):
-        if key.startswith("_form_") or key.startswith("_upd_"):
-            st.session_state.pop(key, None)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -67,471 +63,35 @@ def _find_row_by_id(df: pd.DataFrame, asset_id: str):
     return matches.index[0], matches.iloc[0]
 
 
-def _contrat_fields(row=None):
-    """
-    Affiche le champ Contrat sous forme de liste déroulante.
-    Un contrat = un établissement + une enveloppe (ex: "Boursorama — PEA").
-    Si l'utilisateur choisit "+ Nouveau contrat...", des champs apparaissent
-    pour créer un nouveau contrat.
-    """
-    from services.db_contrats import load_contrats, get_or_create_contrat
-    
-    initial_contrat_id = str(row.get("contrat_id", "") or "").strip() if row is not None else ""
-    
-    NOUVEAU_CONTRAT = "+ Nouveau contrat..."
-    
-    # ── Charger les contrats existants ───────────────────────────────────────
-    df_contrats = load_contrats()
-    contrat_options = []
-    contrat_id_to_display = {}
-    
-    for _, contrat_row in df_contrats.iterrows():
-        display = f"{contrat_row['etablissement']} — {contrat_row['enveloppe']}"
-        contrat_options.append(display)
-        contrat_id_to_display[display] = contrat_row['id']
-    
-    # Ajouter l'option nouveau contrat
-    contrat_options.append(NOUVEAU_CONTRAT)
-    
-    # Trouver l'affichage correspondant au contrat_id initial
-    default_display = contrat_options[0] if contrat_options else NOUVEAU_CONTRAT
-    if initial_contrat_id:
-        for display, cid in contrat_id_to_display.items():
-            if cid == initial_contrat_id:
-                default_display = display
-                break
-    
-    default_idx = contrat_options.index(default_display) if default_display in contrat_options else 0
-    
-    # ── Sélection du contrat ─────────────────────────────────────────────────
-    contrat_selection = st.selectbox(
-        "Contrat *",
-        options=contrat_options,
-        index=default_idx,
-        key="_form_contrat_select",
-        help="Établissement + enveloppe (ex: Boursorama — PEA)"
-    )
-    
-    contrat_id = None
-    if contrat_selection == NOUVEAU_CONTRAT:
-        # ── Création d'un nouveau contrat ───────────────────────────────────
-        st.markdown("**Nouveau contrat**")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            etablissement = st.text_input(
-                "Établissement *",
-                placeholder="ex. Boursorama, Degiro, Crédit Agricole",
-                key="_form_etablissement_new"
-            ).strip()
-        
-        with col2:
-            from constants import ENVELOPPES
-            enveloppe = st.selectbox(
-                "Enveloppe *",
-                options=sorted(ENVELOPPES),
-                key="_form_enveloppe_new"
-            )
-        
-        # Stocker les infos du nouveau contrat pour la création lors de la sauvegarde
-        st.session_state["_new_contrat"] = {
-            "etablissement": etablissement,
-            "enveloppe": enveloppe
-        }
-    else:
-        # Contrat existant
-        contrat_id = contrat_id_to_display[contrat_selection]
-        # Nettoyer le nouveau contrat potentiellement précédent
-        st.session_state.pop("_new_contrat", None)
-    
-    return contrat_id
+# ── Modales (@st.dialog doit rester dans ce fichier) ─────────────────────────
 
-
-# ── Ticker picker ─────────────────────────────────────────────────────────────
-
-def _ticker_picker(initial_ticker: str = "") -> dict | None:
-    help_ticker=""":small[Le ticker est affiché entre parenthèses sur https://finance.yahoo.com/markets/]"""
-
-    ticker_input = st.text_input(
-        "Ticker *",
-        value=initial_ticker,
-        placeholder="ex. AAPL, BTC-USD, CW8.PA",
-        key="_form_ticker_input",
-        help=help_ticker
-    ).strip().upper()
-
-    if st.session_state.get("_form_ticker_last") != ticker_input:
-        st.session_state.pop("_form_ticker_preview", None)
-        st.session_state["_form_ticker_last"] = ticker_input
-    if ticker_input == initial_ticker and initial_ticker != "":
-        return {"ticker": ticker_input, "prefilled": True}
-
-    if st.button(
-        "Vérifier le ticker",
-        use_container_width=True,
-        key="_form_verify_btn",
-        icon=":material/search_check_2:",
-    ):
-        valid, err = validate_ticker(ticker_input)
-        if not valid:
-            st.error(err)
-        else:
-            with st.spinner("Recherche en cours…"):
-                result = lookup_ticker(ticker_input)
-            if result:
-                st.session_state["_form_ticker_preview"] = result
-            else:
-                st.error(f"Ticker « {ticker_input} » introuvable sur yfinance.")
-
-    if "_form_ticker_preview" in st.session_state:
-        preview = st.session_state["_form_ticker_preview"]
-        with st.container(border=True):
-            st.markdown(f"**{preview['name']}**")
-            price_str = f"{preview['price']:,.4f} {preview['currency']}".strip()
-            st.caption(f"{preview['ticker']} · {price_str}")
-        return preview
-
-    return None
-
-
-# ── Formulaire actif automatique ──────────────────────────────────────────────
-
-def _form_auto(df, mode, idx, row, invalidate_cache_fn, flash_fn):
-    initial_ticker    = row.get("ticker", "")    if mode == "edit" else ""
-    initial_quantite  = float(row.get("quantite") or 0.0) if mode == "edit" else 0.0
-    initial_pru       = float(row.get("pru")      or 0.0) if mode == "edit" else 0.0
-    auto_categories   = [c for c in CATEGORIES_ASSETS if c in CATEGORIES_AUTO]
-    initial_categorie = row["categorie"] if mode == "edit" and row["categorie"] in auto_categories else auto_categories[0]
-
-    col_categorie, col_contrat = st.columns(2)
-    with col_categorie:
-        categorie = st.selectbox(
-            "Catégorie", options=auto_categories,
-            index=auto_categories.index(initial_categorie),
-            key="_form_categorie",
-        )
-    with col_contrat:
-        contrat_id = _contrat_fields(row if mode == "edit" else None)
-
-
-
-    #Ticker 
-    ticker_result = _ticker_picker(initial_ticker=initial_ticker)
-
-    if ticker_result is None:
-        _cancel_button()
-        return df
-
-    # ── Quantité et PRU ─────────────────────────────────────────────────────
-    if mode == "create":
-        col_quantite, col_pru = st.columns(2)
-        with col_quantite:
-            quantite = st.number_input("Quantité", min_value=0.0, value=initial_quantite, step=1.0, format="%g", key="_form_quantite")
-        with col_pru:
-            pru      = st.number_input("PRU (€)",  min_value=0.0, value=initial_pru,      step=1.0, format="%g", key="_form_pru", help="Prix de Revient Unitaire, Prix d'achat (hors frais).")
-    else:
-        quantite = float(row.get("quantite") or 0.0)
-        pru = float(row.get("pru") or 0.0)
-        st.caption(f"Position actuelle : {quantite:g} unités · PRU {pru:g} € — modifiable via :material/history:")
-
-    # ── Boutons ─────────────────────────────────────────────────────────────
-
-    c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
-        _close_dialog()
-        st.rerun()
-
-    if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
-        # Gérer la création du contrat si nécessaire
-        final_contrat_id = contrat_id
-        if contrat_id is None and "_new_contrat" in st.session_state:
-            new_contrat = st.session_state["_new_contrat"]
-            if new_contrat["etablissement"] and new_contrat["enveloppe"]:
-                from services.db_contrats import get_or_create_contrat
-                final_contrat_id = get_or_create_contrat(
-                    new_contrat["etablissement"], 
-                    new_contrat["enveloppe"]
-                )
-        
-        if not final_contrat_id:
-            st.warning("Le contrat est obligatoire.")
-        else:
-            effective_ticker = ticker_result["ticker"]
-            if mode == "create":
-                with st.spinner("Ajout en cours…"):
-                    df, msg, msg_type = create_auto_asset(
-                        df, effective_ticker, quantite, pru, categorie,
-                        contrat_id=final_contrat_id,
-                    )
-            else:
-                ticker_current   = row.get("ticker", "")
-                quantite_current = float(row.get("quantite") or 0.0)
-                with st.spinner("Synchronisation du prix…"):
-                    df, msg, msg_type = edit_auto_asset(
-                        df, idx, row["id"],
-                        effective_ticker, ticker_current,
-                        quantite, quantite_current,
-                        pru, categorie,
-                        contrat_id=final_contrat_id,
-                    )
-            flash_fn(msg, msg_type)
-            _close_dialog()
-            invalidate_cache_fn()
-            st.rerun()
-
-    return df
-
-
-# ── Formulaire actif manuel ───────────────────────────────────────────────────
-
-def _form_manual(df, mode, idx, row, invalidate_cache_fn, flash_fn):
-    manual_categories = [c for c in CATEGORIES_ASSETS if c not in CATEGORIES_AUTO]
-    initial_nom       = row["nom"]            if mode == "edit" else ""
-    initial_montant   = float(row["montant"]) if mode == "edit" else 0.0
-    initial_categorie = row["categorie"] if mode == "edit" and row["categorie"] in manual_categories else manual_categories[0]
-
-    col_categorie, col_contrat = st.columns(2)
-    with col_categorie:
-        #Catégorie
-        categorie = st.selectbox(
-            "Catégorie", options=manual_categories,
-            index=manual_categories.index(initial_categorie),
-            key="_form_categorie",
-        )
-    with col_contrat:
-        #Contrat (après catégorie, pour conditionner l'affichage)
-        contrat_id = None  # Par défaut None pour l'immobilier
-        if categorie != "Immobilier":
-            contrat_id = _contrat_fields(row if mode == "edit" else None)
-
-    col_nom, col_montant = st.columns(2)
-    with col_nom:
-        nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
-    with col_montant:
-        montant = st.number_input("Montant (€)", min_value=0.0, value=initial_montant, step=100.0, key="_form_montant")
-
-    immo_params = None
-    if categorie == "Immobilier":
-        st.markdown("**Détail immobilier**")
-        type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "autre"
-        if type_bien_val not in TYPE_BIEN_OPTIONS:
-            type_bien_val = "autre"
-        type_bien = st.selectbox(
-            "Type de bien",
-            options=TYPE_BIEN_OPTIONS,
-            index=TYPE_BIEN_OPTIONS.index(type_bien_val),
-            key="_form_type_bien",
-        )
-        prix_achat = st.number_input(
-            "Prix d'achat (€)",
-            min_value=0.0,
-            value=float(row.get("prix_achat") or row.get("montant") or 0.0) if mode == "edit" else montant,
-            step=1000.0,
-            key="_form_prix_achat",
-        )
-        adresse = st.text_input(
-            "Adresse",
-            value=str(row.get("adresse") or "").strip() if mode == "edit" else "",
-            placeholder="Optionnel",
-            key="_form_adresse",
-        )
-        superficie = st.number_input(
-            "Superficie (m²)",
-            min_value=0.0,
-            value=float(row.get("superficie_m2") or 0.0) if mode == "edit" else 0.0,
-            step=5.0,
-            key="_form_superficie",
-        )
-        df_emprunts = load_emprunts()
-        emprunt_options = ["Aucun"] + [f"{r['nom']}" for _, r in df_emprunts.iterrows()]
-        if mode == "edit" and row is not None:
-            current_emprunt_id = row.get("emprunt_id")
-            current_emprunt_id = None if pd.isna(current_emprunt_id) or current_emprunt_id == "" else str(current_emprunt_id)
-        else:
-            current_emprunt_id = None
-        if current_emprunt_id and not df_emprunts.empty:
-            match = df_emprunts[df_emprunts["id"] == current_emprunt_id]
-            default_idx = list(df_emprunts["id"]).index(current_emprunt_id) + 1 if not match.empty else 0
-        else:
-            default_idx = 0
-        emprunt_choice = st.selectbox(
-            "Emprunt lié",
-            options=emprunt_options,
-            index=min(default_idx, len(emprunt_options) - 1),
-            key="_form_emprunt",
-        )
-        emprunt_id = None if emprunt_choice == "Aucun" else df_emprunts.iloc[emprunt_options.index(emprunt_choice) - 1]["id"]
-        immo_params = {
-            "prix_achat": prix_achat,
-            "type_bien": type_bien,
-            "adresse": adresse.strip() or None,
-            "superficie_m2": superficie if superficie > 0 else None,
-            "emprunt_id": emprunt_id,
-        }
-
-    c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
-        _close_dialog()
-        st.rerun()
-
-    if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
-        # Gérer la création du contrat si nécessaire
-        final_contrat_id = contrat_id
-        if contrat_id is None and "_new_contrat" in st.session_state:
-            new_contrat = st.session_state["_new_contrat"]
-            if new_contrat["etablissement"] and new_contrat["enveloppe"]:
-                from services.db_contrats import get_or_create_contrat
-                final_contrat_id = get_or_create_contrat(
-                    new_contrat["etablissement"], 
-                    new_contrat["enveloppe"]
-                )
-        
-        if not nom:
-            st.warning("Le nom est obligatoire.")
-        elif categorie != "Immobilier" and not final_contrat_id:
-            st.warning("Le contrat est obligatoire.")
-        else:
-            if mode == "create":
-                df, msg, msg_type = create_manual_asset(
-                    df, nom, categorie, montant,
-                    contrat_id=final_contrat_id,
-                    immo_params=immo_params,
-                )
-            else:
-                df, msg, msg_type = edit_manual_asset(
-                    df, idx, row["id"], nom, categorie, montant,
-                    contrat_id=final_contrat_id,
-                    immo_params=immo_params,
-                )
-            flash_fn(msg, msg_type)
-            _close_dialog()
-            invalidate_cache_fn()
-            st.rerun()
-
-    return df
-
-
-def _cancel_button():
-    if st.button("Annuler", use_container_width=True, key="_form_cancel_early"):
-        _close_dialog()
-        st.rerun()
-
-
-# ── Modale mise à jour datée ──────────────────────────────────────────────────
-
-@st.dialog("Mettre à jour un montant", dismissible=False)
-def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
-    from datetime import date
-
-    try:
-        idx, row = _find_row_by_id(df, asset_id)
-    except ValueError as e:
-        st.error(str(e))
-        if st.button("Fermer"):
-            _close_dialog()
-            st.rerun()
+@st.dialog("Ajouter un actif", dismissible=False, width="large")
+def _dialog_create(df, invalidate_cache_fn, flash_fn, categorie: str):
+    st.markdown(f"## {categorie}")
+    form_module = _FORM_MAP.get(categorie)
+    if form_module is None:
+        st.error(f"Catégorie inconnue : {categorie}")
         return
-
-    is_auto = row["categorie"] in CATEGORIES_AUTO
-    ticker = row.get("ticker", "")
-
-    st.caption(
-        f"{row['nom']}" + (f" · {ticker}" if ticker else "")
-    )
-
-    op_date = st.date_input(
-        "Date de l'opération",
-        value=date.today(),
-        key="_upd_date",
-        help="Date réelle de l'opération, si différente d'aujourd'hui.",
-    )
-
-    if is_auto:
-        quantite_actuelle = float(row.get("quantite") or 0.0)
-        pru_actuel = float(row.get("pru") or 0.0)
-
-        quantite = st.number_input(
-            "Nouvelle quantité totale détenue",
-            min_value=0.0,
-            value=quantite_actuelle,
-            step=1.0,
-            format="%g",
-            key="_upd_quantite",
-        )
-        pru = st.number_input(
-            "Nouveau PRU (€)",
-            min_value=0.0,
-            value=pru_actuel,
-            step=1.0,
-            format="%g",
-            key="_upd_pru",
-            help="Prix de Revient Unitaire",
-        )
-
-    else:
-        montant_actuel = float(row.get("montant") or 0.0)
-        montant = st.number_input(
-            "Montant total (€)",
-            min_value=0.0,
-            value=montant_actuel,
-            step=100.0,
-            key="_upd_montant",
-        )
-
-    c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_upd_cancel"):
-        _close_dialog()
-        st.rerun()
-
-    if c2.button("Enregistrer", type="primary", use_container_width=True, key="_upd_save"):
-        if is_auto:
-            with st.spinner("Enregistrement…"):
-                df, msg, msg_type = update_at_date(
-                    df, asset_id, row["categorie"],
-                    op_date=op_date,
-                    quantite=quantite,
-                    pru=pru,
-                )
-        else:
-            df, msg, msg_type = update_at_date(
-                df, asset_id, row["categorie"],
-                op_date=op_date,
-                montant=montant,
-            )
-        flash_fn(msg, msg_type)
-        _close_dialog()
-        invalidate_cache_fn()
-        st.rerun()
+    form_module.render_form(df, "create", None, None, invalidate_cache_fn, flash_fn, categorie)
 
 
-# ── Modales Streamlit (création / édition / suppression) ─────────────────────
-
-@st.dialog("Ajouter un actif", dismissible=False,width="large")
-def _dialog_create(df, invalidate_cache_fn, flash_fn):
-    st.markdown("### Ajouter un actif")
-    is_auto = st.toggle("Actif financier (ticker)", value=True, key="_form_is_auto")
-    if is_auto:
-        _form_auto(df, "create", None, None, invalidate_cache_fn, flash_fn)
-    else:
-        _form_manual(df, "create", None, None, invalidate_cache_fn, flash_fn)
-
-
-@st.dialog("Editer un actif", dismissible=False)
+@st.dialog("Modifier un actif", dismissible=False, width="large")
 def _dialog_edit(df, asset_id, invalidate_cache_fn, flash_fn):
     try:
         idx, row = _find_row_by_id(df, asset_id)
     except ValueError as e:
         st.error(str(e))
         if st.button("Fermer"):
-            _close_dialog()
+            close_dialog()
             st.rerun()
         return
 
     st.markdown(f"### Modifier — {row['nom']}")
-    if row["categorie"] in CATEGORIES_AUTO:
-        _form_auto(df, "edit", idx, row, invalidate_cache_fn, flash_fn)
-    else:
-        _form_manual(df, "edit", idx, row, invalidate_cache_fn, flash_fn)
+    form_module = _FORM_MAP.get(row["categorie"])
+    if form_module is None:
+        st.error(f"Catégorie inconnue : {row['categorie']}")
+        return
+    form_module.render_form(df, "edit", idx, row, invalidate_cache_fn, flash_fn)
 
 
 @st.dialog("Supprimer un actif", dismissible=False)
@@ -541,19 +101,85 @@ def _dialog_delete(df, asset_id, invalidate_cache_fn, flash_fn):
     except ValueError as e:
         st.error(str(e))
         if st.button("Fermer"):
-            _close_dialog()
+            close_dialog()
             st.rerun()
         return
 
     st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
     c1, c2 = st.columns(2)
     if c1.button("Annuler", use_container_width=True, key="_delete_cancel"):
-        _close_dialog()
+        close_dialog()
         st.rerun()
     if c2.button("Confirmer", type="primary", use_container_width=True, key="_delete_confirm"):
         df, msg, msg_type = remove_asset(df, idx, row["id"])
         flash_fn(msg, msg_type)
-        _close_dialog()
+        close_dialog()
+        invalidate_cache_fn()
+        st.rerun()
+
+
+@st.dialog("Mettre à jour un montant", dismissible=False)
+def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
+    try:
+        idx, row = _find_row_by_id(df, asset_id)
+    except ValueError as e:
+        st.error(str(e))
+        if st.button("Fermer"):
+            close_dialog()
+            st.rerun()
+        return
+
+    is_auto = row["categorie"] in CATEGORIES_AUTO
+    ticker  = row.get("ticker", "")
+    st.caption(row["nom"] + (f" · {ticker}" if ticker else ""))
+
+    op_date = st.date_input(
+        "Date de l'opération",
+        value=date.today(),
+        key="_upd_date",
+        help="Date réelle de l'opération, si différente d'aujourd'hui.",
+    )
+
+    if is_auto:
+        quantite = st.number_input(
+            "Nouvelle quantité totale détenue",
+            min_value=0.0,
+            value=float(row.get("quantite") or 0.0),
+            step=1.0,
+            format="%g",
+            key="_upd_quantite",
+        )
+        pru = st.number_input(
+            "Nouveau PRU (€)",
+            min_value=0.0,
+            value=float(row.get("pru") or 0.0),
+            step=1.0,
+            format="%g",
+            key="_upd_pru",
+            help="Prix de Revient Unitaire",
+        )
+    else:
+        montant = st.number_input(
+            "Montant total (€)",
+            min_value=0.0,
+            value=float(row.get("montant") or 0.0),
+            step=100.0,
+            key="_upd_montant",
+        )
+
+    c1, c2 = st.columns(2)
+    if c1.button("Annuler", use_container_width=True, key="_upd_cancel"):
+        close_dialog()
+        st.rerun()
+
+    if c2.button("Enregistrer", type="primary", use_container_width=True, key="_upd_save"):
+        if is_auto:
+            with st.spinner("Enregistrement…"):
+                df, msg, msg_type = update_at_date(df, asset_id, row["categorie"], op_date=op_date, quantite=quantite, pru=pru)
+        else:
+            df, msg, msg_type = update_at_date(df, asset_id, row["categorie"], op_date=op_date, montant=montant)
+        flash_fn(msg, msg_type)
+        close_dialog()
         invalidate_cache_fn()
         st.rerun()
 
@@ -567,7 +193,7 @@ def render_active_dialog(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
 
     dtype = dialog["type"]
     if dtype == "create":
-        _dialog_create(df, invalidate_cache_fn, flash_fn)
+        _dialog_create(df, invalidate_cache_fn, flash_fn, categorie=dialog.get("categorie", "Actions & Fonds"))
     elif dtype == "edit":
         _dialog_edit(df, dialog["asset_id"], invalidate_cache_fn, flash_fn)
     elif dtype == "delete":

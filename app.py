@@ -17,7 +17,7 @@ from ui.tab_emprunts import render as render_emprunts
 from ui.tab_historique import render as render_historique
 from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog, set_dialog_create
-from ui.emprunt_form import render_emprunt_dialog, set_emprunt_dialog_create
+from ui.forms.form_emprunt import set_emprunt_dialog_create, render_emprunt_dialog
 from constants import CATEGORIES_AUTO
 from datetime import datetime
 
@@ -109,10 +109,17 @@ st.logo(image=":material/finance_mode:", size="large", icon_image=":material/fin
 with st.container(horizontal=True, vertical_alignment="bottom"):
     st.title("Suivi de patrimoine", anchor=False)
     with st.popover("Compléter mon patrimoine", type="primary", icon=":material/add:"):
-        if st.button("Ajouter un actif", use_container_width=True, key="add_actif"):
-            set_dialog_create()
-            st.rerun()
-        if st.button("Ajouter un passif", use_container_width=True, key="add_passif"):
+        for label, icon, categorie in [
+            ("Actions & Fonds", ":material/candlestick_chart:", "Actions & Fonds"),
+            ("Crypto",          ":material/currency_bitcoin:", "Crypto"),
+            ("Livret",          ":material/savings:",          "Livrets"),
+            ("Immobilier",      ":material/home:",             "Immobilier"),
+            ("Fonds euros",     ":material/shield:",           "Fonds euros"),
+        ]:
+            if st.button(label, use_container_width=True, icon=icon, key=f"add_{categorie}"):
+                set_dialog_create(categorie)
+                st.rerun()
+        if st.button("Crédit / Emprunt", use_container_width=True, icon=":material/credit_card:", key="add_passif"):
             set_emprunt_dialog_create()
             st.rerun()
 

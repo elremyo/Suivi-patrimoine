@@ -1,26 +1,27 @@
 """
-ui/emprunt_form.py
-──────────────────
+ui/forms/form_emprunt.py
+─────────────────────────
 Modales pour la création, l'édition et la suppression d'un emprunt.
 
 Session state : _emprunt_dialog
     {"type": "create"}
-    {"type": "edit", "emprunt_id": "..."}
+    {"type": "edit",   "emprunt_id": "..."}
     {"type": "delete", "emprunt_id": "..."}
 
-Points d'entrée :
+Points d'entrée publics :
     set_emprunt_dialog_create()
     set_emprunt_dialog_edit(emprunt_id)
     set_emprunt_dialog_delete(emprunt_id)
     render_emprunt_dialog(flash_fn)
 """
-
 import streamlit as st
 import pandas as pd
 from datetime import date
 
 from services.db_emprunts import load_emprunts, create_emprunt, update_emprunt, delete_emprunt
 
+
+# ── Gestion de l'état ─────────────────────────────────────────────────────────
 
 def set_emprunt_dialog_create():
     st.session_state["_emprunt_dialog"] = {"type": "create"}
@@ -41,6 +42,8 @@ def _close_dialog():
             st.session_state.pop(key, None)
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
 def _date_to_str(d) -> str:
     if d is None or (isinstance(d, float) and pd.isna(d)):
         return ""
@@ -56,6 +59,7 @@ def _find_emprunt(emprunt_id: str) -> pd.Series:
         raise ValueError("Emprunt introuvable.")
     return row.iloc[0]
 
+
 def _format_duree(duree_mois: int) -> str:
     ans = duree_mois // 12
     mois = duree_mois % 12
@@ -65,18 +69,17 @@ def _format_duree(duree_mois: int) -> str:
         return f"{ans} ans"
     return f"{ans} ans {mois} mois"
 
-# ── Formulaire (champs communs create / edit) ───────────────────────────────────
+
+# ── Formulaire (champs communs create / edit) ─────────────────────────────────
 
 def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
-    """
-    Affiche les champs du formulaire. Retourne True si Sauvegarder a été cliqué avec succès.
-    """
     nom = st.text_input(
         "Nom de l'emprunt *",
         value=str(edit_row["nom"]) if edit_row is not None else "",
         placeholder="Ex. Prêt immobilier résidence principale",
         key="_emprunt_form_nom",
     )
+
     c1, c2, c3 = st.columns(3)
     with c1:
         montant = st.number_input(
@@ -103,18 +106,18 @@ def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
             step=50.0,
             key="_emprunt_form_mensualite",
         )
-    d1, d2, d3 = st.columns([0.7, 0.3, 1],vertical_alignment="bottom")
+
+    d1, d2, d3 = st.columns([0.7, 0.3, 1], vertical_alignment="bottom")
     with d1:
         duree_mois = st.number_input(
             "Durée (mois)",
             min_value=1,
+            max_value=360,
             value=int(edit_row["duree_mois"]) if edit_row is not None else 240,
             step=12,
             key="_emprunt_form_duree",
-            max_value=360,
         )
     with d2:
-        #afficher la durée en années
         st.caption(_format_duree(duree_mois))
     with d3:
         date_debut_val = _date_to_str(edit_row["date_debut"]) if edit_row is not None else date.today().isoformat()
@@ -164,7 +167,7 @@ def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
     return False
 
 
-# ── Modales ────────────────────────────────────────────────────────────────────
+# ── Modales ───────────────────────────────────────────────────────────────────
 
 @st.dialog("Ajouter un emprunt", dismissible=False, width="large")
 def _dialog_create(flash_fn):
@@ -208,7 +211,7 @@ def _dialog_delete(emprunt_id: str, flash_fn):
         st.rerun()
 
 
-# ── Point d'entrée public ──────────────────────────────────────────────────────
+# ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render_emprunt_dialog(flash_fn):
     dialog = st.session_state.get("_emprunt_dialog")

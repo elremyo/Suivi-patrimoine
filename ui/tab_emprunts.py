@@ -8,7 +8,8 @@ import streamlit as st
 import pandas as pd
 
 from services.db_emprunts import load_emprunts, get_total_emprunts
-from ui.emprunt_form import set_emprunt_dialog_create, set_emprunt_dialog_edit, set_emprunt_dialog_delete, _format_duree
+from ui.forms.form_emprunt import set_emprunt_dialog_edit, set_emprunt_dialog_delete, render_emprunt_dialog
+from ui.forms._shared import _format_duree
 import plotly.graph_objects as go
 from datetime import date
 from constants import PLOTLY_LAYOUT
