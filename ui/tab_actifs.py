@@ -15,11 +15,12 @@ from ui.asset_form import set_dialog_create, set_dialog_edit, set_dialog_delete,
 from ui.asset_detail import set_asset_detail, is_asset_detail_active, get_current_asset_id
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
 from services.db_contrats import load_contrats
+from services.db_emprunts import load_emprunts
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
 
-def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None):
+def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_emprunts: pd.DataFrame = None):    
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
     cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5], vertical_alignment="center")
 
@@ -79,8 +80,42 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None):
                 immo_parts.append(f"{float(row['superficie_m2']):.0f} m²")
             if row.get("adresse") and str(row.get("adresse")).strip():
                 immo_parts.append(str(row.get("adresse")).strip())
+            if row.get("usage") == "residence_principale":
+                immo_parts.append("Résidence principale")
             if immo_parts:
                 cols[0].caption(" · ".join(immo_parts))
+
+            # ── Métriques locatives ───────────────────────────────────────────
+            if row.get("usage") == "locatif":
+                loyer = float(row.get("loyer_mensuel") or 0)
+                charges = float(row.get("charges_mensuelles") or 0)
+                taxe = float(row.get("taxe_fonciere_annuelle") or 0)
+                cout_reel = (
+                    float(row.get("prix_achat") or 0)
+                    + float(row.get("frais_notaire") or 0)
+                    + float(row.get("montant_travaux") or 0)
+                )
+                mensualite = 0.0
+                emprunt_id = row.get("emprunt_id")
+                if emprunt_id and df_emprunts is not None and not pd.isna(emprunt_id):
+                    emp = df_emprunts[df_emprunts["id"] == str(emprunt_id)]
+                    if not emp.empty:
+                        mensualite = float(emp.iloc[0]["mensualite"])
+
+                loc_parts = []
+                if loyer > 0 and cout_reel > 0:
+                    rendement_brut = loyer * 12 / cout_reel * 100
+                    loc_parts.append(f":material/percent: {rendement_brut:.1f} % brut")
+                if loyer > 0:
+                    cashflow = loyer - charges - taxe / 12 - mensualite
+                    sign = "+" if cashflow >= 0 else ""
+                    color = "green" if cashflow >= 0 else "red"
+                    loc_parts.append(f"Cashflow : :{color}[**{sign}{cashflow:.0f} €/m**]")
+                    if mensualite > 0:
+                        effort = mensualite - (loyer - charges - taxe / 12)
+                        loc_parts.append(f"Effort : {effort:.0f} €/m")
+                if loc_parts:
+                    cols[0].caption(" · ".join(loc_parts))
 
     # ── Quantité (actifs auto uniquement) ─────────────────────────────────────
     if is_auto_row:
@@ -133,6 +168,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
 
     # Charger les contrats une seule fois pour éviter les requêtes multiples
     df_contrats = load_contrats()
+    df_emprunts = load_emprunts()
 
     has_auto_assets = (
         not df.empty
@@ -209,7 +245,7 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
             df_cat = df[df["categorie"] == categorie]
             for _, row in df_cat.iterrows():
                 with st.container(border=True, vertical_alignment="center"):
-                    _render_asset_row(row, df_contrats)
+                    _render_asset_row(row, df_contrats=df_contrats, df_emprunts=df_emprunts)
             st.space(size="small")
 
     return df
