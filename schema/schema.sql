@@ -71,7 +71,10 @@ CREATE TABLE IF NOT EXISTS actifs_immobilier (
   notes TEXT
   frais_notaire REAL DEFAULT 0,
   montant_travaux REAL DEFAULT 0,
-  usage TEXT DEFAULT 'locatif' CHECK(usage IN ('residence_principale', 'locatif'))
+  usage TEXT DEFAULT 'locatif' CHECK(usage IN ('residence_principale', 'locatif')),
+  loyer_mensuel REAL DEFAULT 0,
+  charges_mensuelles REAL DEFAULT 0,
+  taxe_fonciere_annuelle REAL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_actifs_immobilier_emprunt ON actifs_immobilier(emprunt_id);

@@ -92,13 +92,20 @@ def _migrate(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.commit()
-    
-    # Migration 3 — nouveaux champs immobilier
+
+    # Migration 3 — nouveaux champs immobilier (coût réel + usage)
     immo_cols = [row[1] for row in conn.execute("PRAGMA table_info(actifs_immobilier)").fetchall()]
     if "frais_notaire" not in immo_cols:
         conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN frais_notaire REAL DEFAULT 0")
         conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN montant_travaux REAL DEFAULT 0")
         conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN usage TEXT DEFAULT 'locatif'")
+        conn.commit()
+
+    # Migration 4 — suivi locatif
+    if "loyer_mensuel" not in immo_cols:
+        conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN loyer_mensuel REAL DEFAULT 0")
+        conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN charges_mensuelles REAL DEFAULT 0")
+        conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN taxe_fonciere_annuelle REAL DEFAULT 0")
         conn.commit()
 
 

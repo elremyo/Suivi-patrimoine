@@ -22,7 +22,7 @@ ASSETS_FLAT_COLUMNS = [
     "id", "nom", "categorie", "montant", "ticker", "quantite", "pru",
     "contrat_id",
 ]
-IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2", "frais_notaire", "montant_travaux", "usage"]
+IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2", "frais_notaire", "montant_travaux", "usage", "loyer_mensuel", "charges_mensuelles", "taxe_fonciere_annuelle"]
 
 def load_assets() -> pd.DataFrame:
     """
@@ -41,7 +41,17 @@ def load_assets() -> pd.DataFrame:
         """
         df = pd.read_sql_query(q, conn)
 
-        q_immo = "SELECT actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, COALESCE(frais_notaire, 0) AS frais_notaire, COALESCE(montant_travaux, 0) AS montant_travaux, COALESCE(usage, 'locatif') AS usage FROM actifs_immobilier"
+        q_immo = """
+            SELECT actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2,
+                   COALESCE(frais_notaire, 0) AS frais_notaire,
+                   COALESCE(montant_travaux, 0) AS montant_travaux,
+                   COALESCE(usage, 'locatif') AS usage,
+                   COALESCE(loyer_mensuel, 0) AS loyer_mensuel,
+                   COALESCE(charges_mensuelles, 0) AS charges_mensuelles,
+                   COALESCE(taxe_fonciere_annuelle, 0) AS taxe_fonciere_annuelle
+            FROM actifs_immobilier
+        """
+
         try:
             df_immo = pd.read_sql_query(q_immo, conn)
         except pd.errors.DatabaseError:
@@ -55,7 +65,7 @@ def load_assets() -> pd.DataFrame:
         df = df.merge(df_immo, left_on="id", right_on="actif_id", how="left", suffixes=("", "_immo"))
         if "actif_id" in df.columns:
             df = df.drop(columns=["actif_id"])
-        for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id", "frais_notaire", "montant_travaux", "usage"]:
+        for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id", "frais_notaire", "montant_travaux", "usage", "loyer_mensuel", "charges_mensuelles", "taxe_fonciere_annuelle"]:
             if col not in df.columns:
                 df[col] = None
 
@@ -134,11 +144,17 @@ def save_assets(df: pd.DataFrame) -> None:
                 montant_travaux = float(montant_travaux) if montant_travaux is not None and not pd.isna(montant_travaux) else 0.0
                 usage = row.get("usage")
                 usage = str(usage) if usage in ("residence_principale", "locatif") else "locatif"
+                loyer_mensuel = row.get("loyer_mensuel")
+                loyer_mensuel = float(loyer_mensuel) if loyer_mensuel is not None and not pd.isna(loyer_mensuel) else 0.0
+                charges_mensuelles = row.get("charges_mensuelles")
+                charges_mensuelles = float(charges_mensuelles) if charges_mensuelles is not None and not pd.isna(charges_mensuelles) else 0.0
+                taxe_fonciere = row.get("taxe_fonciere_annuelle")
+                taxe_fonciere = float(taxe_fonciere) if taxe_fonciere is not None and not pd.isna(taxe_fonciere) else 0.0
 
                 conn.execute(
                     """
-                    INSERT INTO actifs_immobilier (actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, frais_notaire, montant_travaux, usage)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO actifs_immobilier (actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, frais_notaire, montant_travaux, usage, loyer_mensuel, charges_mensuelles, taxe_fonciere_annuelle)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(actif_id) DO UPDATE SET
                         prix_achat = excluded.prix_achat,
                         emprunt_id = excluded.emprunt_id,
@@ -147,9 +163,12 @@ def save_assets(df: pd.DataFrame) -> None:
                         superficie_m2 = excluded.superficie_m2,
                         frais_notaire = excluded.frais_notaire,
                         montant_travaux = excluded.montant_travaux,
-                        usage = excluded.usage
+                        usage = excluded.usage,
+                        loyer_mensuel = excluded.loyer_mensuel,
+                        charges_mensuelles = excluded.charges_mensuelles,
+                        taxe_fonciere_annuelle = excluded.taxe_fonciere_annuelle
                     """,
-                    (aid, prix_achat, emprunt_id, type_bien, adresse, superficie, frais_notaire, montant_travaux, usage),
+                    (aid, prix_achat, emprunt_id, type_bien, adresse, superficie, frais_notaire, montant_travaux, usage, loyer_mensuel, charges_mensuelles, taxe_fonciere),
                 )
             else:
                 conn.execute("DELETE FROM actifs_immobilier WHERE actif_id = ?", (aid,))

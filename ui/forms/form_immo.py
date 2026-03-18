@@ -21,28 +21,16 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
     initial_nom     = row["nom"]            if mode == "edit" else ""
     initial_montant = float(row["montant"]) if mode == "edit" else 0.0
 
-    col_nom, col_montant = st.columns(2)
+    usage_options = {"residence_principale": "Résidence principale", "locatif": "Locatif"}
+    usage_val = str(row.get("usage") or "locatif") if mode == "edit" else "residence_principale"
+    if usage_val not in usage_options:
+        usage_val = "residence_principale"
+
+    col_nom, col_usage = st.columns(2)
     with col_nom:
         nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
-    with col_montant:
-        montant = st.number_input("Valeur actuelle (€)", min_value=0.0, value=initial_montant, step=1000.0, key="_form_montant")
-
-    st.markdown("**Détail immobilier**")
-
-    type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "autre"
-    if type_bien_val not in TYPE_BIEN_OPTIONS:
-        type_bien_val = "autre"
-    type_bien = st.selectbox(
-        "Type de bien",
-        options=TYPE_BIEN_OPTIONS,
-        index=TYPE_BIEN_OPTIONS.index(type_bien_val),
-        key="_form_type_bien",
-    )
-    usage_options = {"locatif": "Locatif", "residence_principale": "Résidence principale"}
-    usage_val = str(row.get("usage") or "locatif") if mode == "edit" else "locatif"
-    if usage_val not in usage_options:
-        usage_val = "locatif"
-    usage = st.radio(
+    with col_usage:
+        usage = st.radio(
         "Usage du bien",
         options=list(usage_options.keys()),
         format_func=lambda x: usage_options[x],
@@ -50,27 +38,56 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         horizontal=True,
         key="_form_usage",
     )
-    prix_achat = st.number_input(
+    
+
+    st.markdown("**Détail immobilier**")
+
+    type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "autre"
+    if type_bien_val not in TYPE_BIEN_OPTIONS:
+        type_bien_val = "autre"
+
+
+
+    col_type, col_montant = st.columns(2)
+    
+    with col_type:
+        type_bien = st.selectbox(
+        "Type de bien",
+        options=TYPE_BIEN_OPTIONS,
+        index=TYPE_BIEN_OPTIONS.index(type_bien_val),
+        key="_form_type_bien",
+    )
+    with col_montant:
+        montant = st.number_input("Valeur actuelle (€)", min_value=0.0, value=initial_montant, step=1000.0, key="_form_montant")
+
+
+    col_achat, col_superficie = st.columns(2)
+    with col_achat:
+        prix_achat = st.number_input(
         "Prix d'achat (€)",
         min_value=0.0,
         value=float(row.get("prix_achat") or row.get("montant") or 0.0) if mode == "edit" else montant,
         step=1000.0,
         key="_form_prix_achat",
     )
+    with col_superficie:
+        superficie = st.number_input(
+            "Superficie (m²)",
+            min_value=0.0,
+            value=float(row.get("superficie_m2") or 0.0) if mode == "edit" else 0.0,
+            step=5.0,
+            key="_form_superficie",
+        )
     adresse = st.text_input(
         "Adresse",
         value=str(row.get("adresse") or "").strip() if mode == "edit" else "",
         placeholder="Optionnel",
         key="_form_adresse",
     )
-    superficie = st.number_input(
-        "Superficie (m²)",
-        min_value=0.0,
-        value=float(row.get("superficie_m2") or 0.0) if mode == "edit" else 0.0,
-        step=5.0,
-        key="_form_superficie",
-    )
 
+
+    # ── Coût d'acquisition ─────────────────────────────────────────────────────
+    st.divider()
     st.markdown("**Coût d'acquisition**")
     col_notaire, col_travaux = st.columns(2)
     with col_notaire:
@@ -117,6 +134,41 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
     )
     emprunt_id = None if emprunt_choice == "Aucun" else df_emprunts.iloc[emprunt_options.index(emprunt_choice) - 1]["id"]
 
+    # ── Revenus locatifs (uniquement si locatif) ──────────────────────────────
+    loyer_mensuel = 0.0
+    charges_mensuelles = 0.0
+    taxe_fonciere_annuelle = 0.0
+
+    if usage == "locatif":
+        st.divider()
+        st.markdown("**Revenus locatifs**")
+        col_loyer, col_charges, col_taxe = st.columns(3)
+        with col_loyer:
+            loyer_mensuel = st.number_input(
+                "Loyer mensuel brut (€)",
+                min_value=0.0,
+                value=float(row.get("loyer_mensuel") or 0.0) if mode == "edit" else 0.0,
+                step=50.0,
+                key="_form_loyer_mensuel",
+            )
+        with col_charges:
+            charges_mensuelles = st.number_input(
+                "Charges mensuelles (€)",
+                min_value=0.0,
+                value=float(row.get("charges_mensuelles") or 0.0) if mode == "edit" else 0.0,
+                step=50.0,
+                help="Gestion locative, assurance PNO, charges non récupérables…",
+                key="_form_charges_mensuelles",
+            )
+        with col_taxe:
+            taxe_fonciere_annuelle = st.number_input(
+                "Taxe foncière annuelle (€)",
+                min_value=0.0,
+                value=float(row.get("taxe_fonciere_annuelle") or 0.0) if mode == "edit" else 0.0,
+                step=100.0,
+                key="_form_taxe_fonciere",
+            )
+
     immo_params = {
         "prix_achat": prix_achat,
         "type_bien": type_bien,
@@ -126,6 +178,9 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
         "frais_notaire": frais_notaire,
         "montant_travaux": montant_travaux,
         "usage": usage,
+        "loyer_mensuel": loyer_mensuel,
+        "charges_mensuelles": charges_mensuelles,
+        "taxe_fonciere_annuelle": taxe_fonciere_annuelle,
     }
 
     c1, c2 = st.columns(2)
