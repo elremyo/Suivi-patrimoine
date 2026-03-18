@@ -69,7 +69,18 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
             st.markdown(f"{icon} :small[:grey[{ticker_line}]]")
 
     else:
-        cols[0].write(row["nom"])
+        if row["categorie"] == "Immobilier":
+            if cols[0].button(
+                row["nom"],
+                key=f"detail_{row['id']}",
+                help="Voir le détail de ce bien",
+                type="tertiary",
+                icon=":material/home:",
+            ):
+                set_asset_detail(row["id"])
+                st.rerun()
+        else:
+            cols[0].write(row["nom"])
         if meta_str:
             cols[0].caption(meta_str)
         if row["categorie"] == "Immobilier":

@@ -166,6 +166,111 @@ def render_asset_info(asset_info: dict):
         sector = asset_info.get("sector")
         st.metric("Secteur", sector if sector else "N/A")
 
+def _render_immo_detail(asset: pd.Series):
+    """Page de détail pour un bien immobilier."""
+    from services.db_emprunts import load_emprunts
+
+    # ── Bouton retour + titre ─────────────────────────────────────────────────
+    with st.container(horizontal=True, vertical_alignment="bottom"):
+        if st.button("← Retour", key="btn_back_immo", type="secondary"):
+            if "_asset_detail" in st.session_state:
+                del st.session_state["_asset_detail"]
+            st.rerun()
+        usage_label = "Résidence principale" if asset.get("usage") == "residence_principale" else "Locatif"
+        st.subheader(f"{asset['nom']}", anchor=False)
+
+    st.divider()
+
+    # ── Bloc 1 : Identité ─────────────────────────────────────────────────────
+    st.markdown("#### Identité du bien")
+    with st.container(border=True):
+        c1, c2, c3, c4 = st.columns(4)
+        type_bien = str(asset.get("type_bien") or "—").capitalize()
+        c1.metric("Type", type_bien)
+        superficie = asset.get("superficie_m2")
+        c2.metric("Superficie", f"{float(superficie):.0f} m²" if superficie and float(superficie) > 0 else "—")
+        c3.metric("Usage", usage_label)
+        adresse = str(asset.get("adresse") or "—").strip()
+        c4.metric("Adresse", adresse if adresse else "—")
+
+    st.space(size="small")
+
+    # ── Bloc 2 : Valorisation ─────────────────────────────────────────────────
+    st.markdown("#### Valorisation")
+    with st.container(border=True):
+        valeur_actuelle = float(asset.get("montant") or 0)
+        prix_achat = float(asset.get("prix_achat") or 0)
+        frais_notaire = float(asset.get("frais_notaire") or 0)
+        montant_travaux = float(asset.get("montant_travaux") or 0)
+        cout_reel = prix_achat + frais_notaire + montant_travaux
+        plus_value = valeur_actuelle - cout_reel
+        pv_pct = (plus_value / cout_reel * 100) if cout_reel > 0 else 0
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Valeur actuelle", f"{valeur_actuelle:,.0f} €")
+        c2.metric("Prix d'achat", f"{prix_achat:,.0f} €")
+        notaire_str = f"dont {frais_notaire:,.0f} € notaire" if frais_notaire > 0 else ""
+        travaux_str = f"+ {montant_travaux:,.0f} € travaux" if montant_travaux > 0 else ""
+        detail_cout = " · ".join(filter(None, [notaire_str, travaux_str]))
+        c3.metric("Coût réel", f"{cout_reel:,.0f} €", help=detail_cout if detail_cout else None)
+        sign = "+" if plus_value >= 0 else ""
+        c4.metric("Plus-value latente", f"{sign}{plus_value:,.0f} €", delta=f"{sign}{pv_pct:.1f} %")
+
+    st.space(size="small")
+
+    # ── Bloc 3 : Emprunt lié ──────────────────────────────────────────────────
+    emprunt_id = asset.get("emprunt_id")
+    if emprunt_id and not pd.isna(emprunt_id):
+        df_emprunts = load_emprunts()
+        emp = df_emprunts[df_emprunts["id"] == str(emprunt_id)]
+        if not emp.empty:
+            e = emp.iloc[0]
+            st.markdown("#### Emprunt lié")
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns(4)
+                crd = float(e.get("capital_restant_du") or 0)
+                mensualite = float(e.get("mensualite") or 0)
+                taux = float(e.get("taux_annuel") or 0)
+                date_fin = e.get("date_fin")
+                date_fin_str = pd.Timestamp(date_fin).strftime("%m/%Y") if date_fin and not pd.isna(date_fin) else "—"
+                c1.metric("Capital restant dû", f"{crd:,.0f} €")
+                c2.metric("Mensualité", f"{mensualite:,.0f} €/mois")
+                c3.metric("Taux annuel", f"{taux:.2f} %")
+                c4.metric("Fin prévue", date_fin_str)
+            st.space(size="small")
+
+    # ── Bloc 4 : Rendement locatif ────────────────────────────────────────────
+    if asset.get("usage") == "locatif":
+        loyer = float(asset.get("loyer_mensuel") or 0)
+        charges = float(asset.get("charges_mensuelles") or 0)
+        taxe = float(asset.get("taxe_fonciere_annuelle") or 0)
+
+        st.markdown("#### Rendement locatif")
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Loyer mensuel brut", f"{loyer:,.0f} €" if loyer > 0 else "—")
+            c2.metric("Charges mensuelles", f"{charges:,.0f} €" if charges > 0 else "—")
+            c3.metric("Taxe foncière", f"{taxe:,.0f} €/an" if taxe > 0 else "—")
+
+            if loyer > 0:
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                if cout_reel > 0:
+                    rendement_brut = loyer * 12 / cout_reel * 100
+                    c1.metric("Rendement brut", f"{rendement_brut:.2f} %", help="Loyer annuel ÷ coût réel d'acquisition")
+                mensualite_emp = 0.0
+                if emprunt_id and not pd.isna(emprunt_id):
+                    df_emprunts = load_emprunts()
+                    emp = df_emprunts[df_emprunts["id"] == str(emprunt_id)]
+                    if not emp.empty:
+                        mensualite_emp = float(emp.iloc[0]["mensualite"])
+                cashflow = loyer - charges - taxe / 12 - mensualite_emp
+                sign = "+" if cashflow >= 0 else ""
+                c2.metric("Cashflow mensuel", f"{sign}{cashflow:,.0f} €", delta=f"{sign}{cashflow:,.0f} €")
+                if mensualite_emp > 0:
+                    effort = mensualite_emp - (loyer - charges - taxe / 12)
+                    c3.metric("Effort d'épargne", f"{effort:,.0f} €/mois", help="Ce que tu débourses chaque mois au-delà du loyer perçu")
+
 
 def render_asset_detail(asset_id: str, df: pd.DataFrame):
     """
@@ -180,6 +285,11 @@ def render_asset_detail(asset_id: str, df: pd.DataFrame):
     
     asset = asset_row.iloc[0]
     
+    # Dispatcher vers la page immo si nécessaire
+    if asset["categorie"] == "Immobilier":
+        _render_immo_detail(asset)
+        return
+
     # Vérifier que c'est un actif automatique avec ticker
     if asset["categorie"] not in CATEGORIES_AUTO or not asset.get("ticker"):
         st.error("La page de détail n'est disponible que pour les actifs avec ticker")
