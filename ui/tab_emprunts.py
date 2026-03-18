@@ -182,12 +182,6 @@ def render(flash_fn) -> None:
     if not df.empty:
         _render_crd_chart(df)
 
-    with st.container(horizontal=True, vertical_alignment="center"):
-        st.write("")
-        if st.button("Ajouter un emprunt", type="primary", key="btn_add_emprunt", icon=":material/add:"):
-            set_emprunt_dialog_create()
-            st.rerun()
-
     st.space(size="small")
 
     if df.empty:

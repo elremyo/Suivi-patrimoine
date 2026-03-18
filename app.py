@@ -17,7 +17,7 @@ from ui.tab_emprunts import render as render_emprunts
 from ui.tab_historique import render as render_historique
 from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog, set_dialog_create
-from ui.emprunt_form import render_emprunt_dialog
+from ui.emprunt_form import render_emprunt_dialog, set_emprunt_dialog_create
 from constants import CATEGORIES_AUTO
 from datetime import datetime
 
@@ -108,11 +108,13 @@ st.logo(image=":material/finance_mode:", size="large", icon_image=":material/fin
 
 with st.container(horizontal=True, vertical_alignment="bottom"):
     st.title("Suivi de patrimoine", anchor=False)
-    if st.button("Compléter mon patrimoine", key="complete_button", type="primary", icon=":material/add:"):
-        set_dialog_create()
-        st.rerun()
-
-##TODO : créer une modale commune entre actifs et passifs avec des tabs
+    with st.popover("Compléter mon patrimoine", type="primary", icon=":material/add:"):
+        if st.button("Ajouter un actif", use_container_width=True, key="add_actif"):
+            set_dialog_create()
+            st.rerun()
+        if st.button("Ajouter un passif", use_container_width=True, key="add_passif"):
+            set_emprunt_dialog_create()
+            st.rerun()
 
 
 tab_synthese, tab_actifs, tab_passifs, tab_historique, tab_params = st.tabs([
