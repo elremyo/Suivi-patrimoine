@@ -19,6 +19,9 @@ from constants import CATEGORY_COLOR_MAP, CATEGORIES_AUTO, PLOTLY_LAYOUT
 from ui.asset_form import set_dialog_create
 
 
+repartition_columns = [5, 1, 1, 2]
+
+
 # ── Métriques clés ────────────────────────────────────────────────────────────
 
 def _render_kpis(df: pd.DataFrame):
@@ -53,7 +56,7 @@ def _render_repartition_actifs(df: pd.DataFrame):
             pnl_by_cat[categorie] = valeur_actuelle - valeur_achat
 
     # En-tête de la liste
-    header_cols = st.columns([5, 1, 1, 1])
+    header_cols = st.columns(repartition_columns)
     header_cols[0].empty()
     header_cols[1].caption("Répartition")
     header_cols[2].caption("Valeur")
@@ -65,7 +68,7 @@ def _render_repartition_actifs(df: pd.DataFrame):
         pnl = pnl_by_cat.get(categorie)
 
         with st.container(border=True):
-            cols = st.columns([5, 1, 1, 1])
+            cols = st.columns(repartition_columns)
 
             # Nom coloré
             cols[0].markdown(
@@ -143,7 +146,7 @@ def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
 
     st.subheader("Passifs", anchor=False)
 
-    cols_entete = st.columns([5, 1, 1, 1])
+    cols_entete = st.columns(repartition_columns)
     cols_entete[1].caption("Part du patrimoine")
     cols_entete[2].caption("Emprunté")
     cols_entete[3].caption("Restant dû")
@@ -155,7 +158,7 @@ def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
         pct_str = f"{pct:.1f} %" if pct is not None else "—"
 
         with st.container(border=True):
-            cols = st.columns([5, 1, 1, 1])
+            cols = st.columns(repartition_columns)
             cols[0].markdown(f"**{row['nom']}**")
             cols[1].write(pct_str)
             cols[2].write(f"{row['montant_emprunte']:,.0f} €")

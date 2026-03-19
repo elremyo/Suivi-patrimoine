@@ -226,7 +226,7 @@ def _render_immo_detail(asset: pd.Series):
         sign = "+" if plus_value >= 0 else ""
         color = "green" if plus_value >= 0 else "red"
         c4.caption("Plus-value latente")
-        c4.markdown(f"{sign}{plus_value:,.0f} € :{color}-background[{sign}{pv_pct:.1f} %]")
+        c4.markdown(f"{sign}{plus_value:,.0f} € :{color}-badge[{sign}{pv_pct:.1f} %]")
 
     st.space(size="small")
 
@@ -288,7 +288,7 @@ def _render_immo_detail(asset: pd.Series):
                 sign = "+" if cashflow >= 0 else ""
                 color = "green" if cashflow >= 0 else "red"
                 c2.caption("Cashflow mensuel")
-                c2.markdown(f":{color}-background[{sign}{cashflow:,.0f} €]")
+                c2.markdown(f":{color}-badge[{sign}{cashflow:,.0f} €]")
 
 
 

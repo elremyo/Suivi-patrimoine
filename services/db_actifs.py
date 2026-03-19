@@ -22,7 +22,7 @@ ASSETS_FLAT_COLUMNS = [
     "id", "nom", "categorie", "montant", "ticker", "quantite", "pru",
     "contrat_id",
 ]
-IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2", "frais_notaire", "montant_travaux", "usage", "loyer_mensuel", "charges_mensuelles", "taxe_fonciere_annuelle"]
+IMMO_EXTRA_COLUMNS = ["prix_achat", "emprunt_id", "type_bien", "adresse", "superficie_m2", "frais_notaire", "montant_travaux", "usage", "loyer_mensuel", "charges_mensuelles", "taxe_fonciere_annuelle", "date_achat", "notes"]
 
 def load_assets() -> pd.DataFrame:
     """
@@ -48,7 +48,8 @@ def load_assets() -> pd.DataFrame:
                    COALESCE(usage, 'locatif') AS usage,
                    COALESCE(loyer_mensuel, 0) AS loyer_mensuel,
                    COALESCE(charges_mensuelles, 0) AS charges_mensuelles,
-                   COALESCE(taxe_fonciere_annuelle, 0) AS taxe_fonciere_annuelle
+                   COALESCE(taxe_fonciere_annuelle, 0) AS taxe_fonciere_annuelle,
+                   date_achat, notes
             FROM actifs_immobilier
         """
 
@@ -65,7 +66,7 @@ def load_assets() -> pd.DataFrame:
         df = df.merge(df_immo, left_on="id", right_on="actif_id", how="left", suffixes=("", "_immo"))
         if "actif_id" in df.columns:
             df = df.drop(columns=["actif_id"])
-        for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id", "frais_notaire", "montant_travaux", "usage", "loyer_mensuel", "charges_mensuelles", "taxe_fonciere_annuelle"]:
+        for col in ["prix_achat", "type_bien", "adresse", "superficie_m2", "emprunt_id", "frais_notaire", "montant_travaux", "usage", "loyer_mensuel", "charges_mensuelles", "taxe_fonciere_annuelle", "date_achat", "notes"]:
             if col not in df.columns:
                 df[col] = None
 
@@ -150,11 +151,15 @@ def save_assets(df: pd.DataFrame) -> None:
                 charges_mensuelles = float(charges_mensuelles) if charges_mensuelles is not None and not pd.isna(charges_mensuelles) else 0.0
                 taxe_fonciere = row.get("taxe_fonciere_annuelle")
                 taxe_fonciere = float(taxe_fonciere) if taxe_fonciere is not None and not pd.isna(taxe_fonciere) else 0.0
+                date_achat = row.get("date_achat")
+                date_achat = str(date_achat) if date_achat is not None and not pd.isna(date_achat) and str(date_achat).strip() else None
+                notes = row.get("notes")
+                notes = str(notes) if notes is not None and not pd.isna(notes) and str(notes).strip() else None
 
                 conn.execute(
                     """
-                    INSERT INTO actifs_immobilier (actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, frais_notaire, montant_travaux, usage, loyer_mensuel, charges_mensuelles, taxe_fonciere_annuelle)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO actifs_immobilier (actif_id, prix_achat, emprunt_id, type_bien, adresse, superficie_m2, frais_notaire, montant_travaux, usage, loyer_mensuel, charges_mensuelles, taxe_fonciere_annuelle, date_achat, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(actif_id) DO UPDATE SET
                         prix_achat = excluded.prix_achat,
                         emprunt_id = excluded.emprunt_id,
@@ -166,9 +171,11 @@ def save_assets(df: pd.DataFrame) -> None:
                         usage = excluded.usage,
                         loyer_mensuel = excluded.loyer_mensuel,
                         charges_mensuelles = excluded.charges_mensuelles,
-                        taxe_fonciere_annuelle = excluded.taxe_fonciere_annuelle
+                        taxe_fonciere_annuelle = excluded.taxe_fonciere_annuelle,
+                        date_achat = excluded.date_achat,
+                        notes = excluded.notes
                     """,
-                    (aid, prix_achat, emprunt_id, type_bien, adresse, superficie, frais_notaire, montant_travaux, usage, loyer_mensuel, charges_mensuelles, taxe_fonciere),
+                    (aid, prix_achat, emprunt_id, type_bien, adresse, superficie, frais_notaire, montant_travaux, usage, loyer_mensuel, charges_mensuelles, taxe_fonciere, date_achat, notes),
                 )
             else:
                 conn.execute("DELETE FROM actifs_immobilier WHERE actif_id = ?", (aid,))

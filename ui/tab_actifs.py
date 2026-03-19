@@ -87,16 +87,6 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         if meta_str:
             cols[0].caption(meta_str)
         if row["categorie"] == "Immobilier":
-            immo_parts = []
-            if row.get("type_bien") and str(row.get("type_bien")).strip() and str(row.get("type_bien")) != "autre":
-                type_bien_key = str(row.get("type_bien")).strip().lower()
-                type_bien_display = TYPE_BIEN_OPTIONS.get(type_bien_key, str(row.get("type_bien")).strip())
-                immo_parts.append(type_bien_display)
-            if row.get("superficie_m2") and float(row.get("superficie_m2", 0) or 0) > 0:
-                immo_parts.append(f"{float(row['superficie_m2']):.0f} m²")
-            if immo_parts:
-                cols[0].caption(" · ".join(immo_parts))
-
             # ── Métriques locatives ───────────────────────────────────────────
             if row.get("usage") == "locatif":
                 loyer = float(row.get("loyer_mensuel") or 0)
@@ -116,7 +106,7 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
 
                 loc_parts = []
                 if loyer > 0 and cout_reel > 0:
-                    rendement_brut = loyer * 12 / cout_reel * 100
+                    rendement_brut = (loyer-charges) * 12 / cout_reel * 100
                     loc_parts.append(f"{rendement_brut:.1f} % brut")
                 if loyer > 0:
                     cashflow = loyer - charges - taxe / 12 - mensualite

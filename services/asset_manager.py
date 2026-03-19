@@ -12,6 +12,7 @@ Types de message : "success" | "warning" | "error"
 """
 
 import pandas as pd
+from datetime import datetime
 from services.assets import add_asset, update_asset, delete_asset
 from services.historique import record_montant, delete_asset_history
 from services.positions import record_position, delete_asset_positions
@@ -61,7 +62,13 @@ def create_manual_asset(
         for k, v in immo_params.items():
             df.loc[last_idx, k] = v
     asset_id = df.iloc[-1]["id"]
-    record_montant(asset_id, montant)
+    
+    # Utiliser la date d'achat pour l'historique si disponible
+    record_date = None
+    if categorie == "Immobilier" and immo_params and "date_achat" in immo_params:
+        record_date = datetime.strptime(immo_params["date_achat"], "%Y-%m-%d").date()
+    
+    record_montant(asset_id, montant, record_date)
     save_assets(df)
 
     return df, "Actif ajouté", "success"
@@ -111,14 +118,28 @@ def edit_manual_asset(
     immo_params: dict | None = None,
 ) -> tuple[pd.DataFrame, str, str]:
     montant_actuel = float(df.loc[idx, "montant"])
+    
+    # Pour l'immobilier, vérifier si la date d'achat a changé
+    date_achat_changee = False
+    if categorie == "Immobilier" and immo_params and "date_achat" in immo_params:
+        nouvelle_date = immo_params["date_achat"]
+        ancienne_date = str(df.loc[idx, "date_achat"]) if "date_achat" in df.columns and not pd.isna(df.loc[idx, "date_achat"]) else None
+        date_achat_changee = (ancienne_date != nouvelle_date)
 
     df = update_asset(df, idx, nom, categorie, montant,
                       contrat_id=contrat_id)
     if categorie == "Immobilier" and immo_params:
         for k, v in immo_params.items():
             df.loc[idx, k] = v
-    if montant != montant_actuel:
-        record_montant(asset_id, montant)
+    
+    # Mettre à jour l'historique si le montant change OU si la date d'achat change (pour l'immobilier)
+    if montant != montant_actuel or date_achat_changee:
+        # Utiliser la date d'achat pour l'historique si disponible
+        record_date = None
+        if categorie == "Immobilier" and immo_params and "date_achat" in immo_params:
+            record_date = datetime.strptime(immo_params["date_achat"], "%Y-%m-%d").date()
+        
+        record_montant(asset_id, montant, record_date)
 
     save_assets(df)
 
