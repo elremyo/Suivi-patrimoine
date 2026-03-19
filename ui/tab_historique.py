@@ -18,14 +18,6 @@ from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
 def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
-    """
-    Affiche le contenu complet du tab Historique.
-
-    Paramètres :
-    - df           : DataFrame des actifs courants
-    - df_hist      : historique des montants manuels
-    - df_positions : historique des positions (actifs auto)
-    """
     auto_tickers = sorted(
         df[df["categorie"].isin(CATEGORIES_AUTO) & (df["ticker"] != "")]["ticker"]
         .dropna().unique().tolist()
@@ -37,7 +29,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         st.info("Aucun historique disponible. Ajoute des actifs et mets à jour leurs montants pour construire un historique.")
         return
 
-    # ── Sélecteurs ────────────────────────────────────────────────────────────
+    # ── Sélecteurs période + benchmark ───────────────────────────────────────
     col_period, col_benchmark = st.columns([5, 2])
 
     with col_period:
@@ -55,13 +47,12 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
             options=list(BENCHMARK_OPTIONS.keys()),
             index=0,
             key="benchmark_selector",
-            help="Comparer avec un indice de référence. Disponible uniquement avec le total patrimoine."
+            help="Comparer avec un indice de référence."
         )
 
     yf_period, nb_jours = PERIOD_OPTIONS[period_label]
     benchmark_ticker = BENCHMARK_OPTIONS[benchmark_label]
 
-    # Calcul de la date de début pour le filtre
     start_date = None
     if nb_jours is not None:
         start_date = pd.Timestamp.today().normalize() - pd.Timedelta(days=nb_jours)
@@ -71,7 +62,6 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
         cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
 
-        # Récupération de l'indice de comparaison
         df_benchmark = pd.DataFrame()
         if benchmark_ticker:
             df_benchmark = fetch_historical_prices((benchmark_ticker,), yf_period)
@@ -85,44 +75,36 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         if not df_benchmark.empty:
             df_benchmark = df_benchmark[df_benchmark.index >= start_date]
 
-    # Sélecteur de catégories
-    options_total = ["Total patrimoine"]
-    options_cat = list(cat_evo.columns) if not cat_evo.empty else []
-    all_options = options_total + options_cat
+    # ── Segmented control — catégories ───────────────────────────────────────
+    CATEGORIES_EXCLUES_GRAPHE = {"Immobilier"}
+    options_cat = [c for c in cat_evo.columns if c not in CATEGORIES_EXCLUES_GRAPHE] if not cat_evo.empty else []
 
-    selected = st.multiselect(
-        "Catégories à afficher",
-        options=all_options,
-        default=options_cat if options_cat else ["Total patrimoine"],
-        placeholder="Choisir au moins une catégorie…",
+    selected_cats = st.segmented_control(
+        "Catégories",
+        options=options_cat,
+        selection_mode="multi",
+        key="cat_selector",
     )
 
-    if not selected:
-        st.info("Sélectionne au moins une catégorie à afficher.")
-        return
+    # Aucune sélection = toutes les catégories
+    active_cats = selected_cats if selected_cats else options_cat
 
-    _render_chart(selected, total_evo, cat_evo, options_cat, df_benchmark, benchmark_ticker, benchmark_label)
+    _render_chart(active_cats, total_evo, cat_evo, df_benchmark, benchmark_ticker, benchmark_label)
 
 
 def _render_chart(
-    selected: list[str],
+    active_cats: list[str],
     total_evo: pd.DataFrame,
     cat_evo: pd.DataFrame,
-    options_cat: list[str],
     df_benchmark: pd.DataFrame,
     benchmark_ticker: str | None,
     benchmark_label: str,
 ):
-    """Construit et affiche le graphique Plotly des séries sélectionnées."""
     fig = go.Figure()
 
-    selected_cats = [s for s in selected if s in options_cat]
-    show_total = "Total patrimoine" in selected
-    use_stacked = bool(selected_cats)
-
-    # ── Aires empilées (catégories) ───────────────────────────────────────────
-    if use_stacked and not cat_evo.empty:
-        for serie in selected_cats:
+    # ── Aires empilées (catégories actives) ───────────────────────────────────
+    if active_cats and not cat_evo.empty:
+        for serie in active_cats:
             if serie not in cat_evo.columns:
                 continue
             color = CATEGORY_COLOR_MAP.get(serie, "#CCCCCC")
@@ -134,13 +116,7 @@ def _render_chart(
                 fillcolor=color,
             ))
 
-    # ── Ligne total (par-dessus les aires, ou seule) ──────────────────────────
-    if show_total and not total_evo.empty:
-        fig.add_trace(go.Scatter(
-            x=total_evo["date"], y=total_evo["total"],
-            mode="lines", name="Total patrimoine",
-            line=dict(color="#E8EAF0", width=2, dash="dot" if use_stacked else "solid"),
-        ))
+
 
     # ── Indice de comparaison ─────────────────────────────────────────────────
     if (
@@ -148,30 +124,21 @@ def _render_chart(
         and not df_benchmark.empty
         and benchmark_ticker in df_benchmark.columns
         and not total_evo.empty
-        and "Total patrimoine" in selected
     ):
         bench_series = df_benchmark[benchmark_ticker].dropna()
+        total_evo_indexed = total_evo.set_index("date")["total"]
+        first_patrimoine_date = total_evo_indexed.index[0]
+        bench_series = bench_series[bench_series.index >= first_patrimoine_date]
 
-        if not bench_series.empty and not total_evo.empty:
-            total_evo_indexed = total_evo.set_index("date")["total"]
+        if not bench_series.empty:
+            ref_bench = float(bench_series.iloc[0])
+            candidates = total_evo_indexed[total_evo_indexed.index <= bench_series.index[0]]
+            if candidates.empty:
+                candidates = total_evo_indexed
+            ref_patrimoine = float(candidates.iloc[-1])
 
-            # Le benchmark ne commence pas avant la première donnée patrimoine
-            first_patrimoine_date = total_evo_indexed.index[0]
-            bench_series = bench_series[bench_series.index >= first_patrimoine_date]
-
-            if not bench_series.empty:
-                ref_bench = float(bench_series.iloc[0])
-
-                # Valeur patrimoine au point de départ du benchmark
-                candidates = total_evo_indexed[total_evo_indexed.index <= bench_series.index[0]]
-                if candidates.empty:
-                    candidates = total_evo_indexed
-                ref_patrimoine = float(candidates.iloc[-1])
-
-            # Recalage : l'indice démarre au niveau du patrimoine
             if ref_bench > 0:
                 bench_scaled = bench_series * (ref_patrimoine / ref_bench)
-
                 fig.add_trace(go.Scatter(
                     x=bench_scaled.index,
                     y=bench_scaled.values,
