@@ -10,7 +10,7 @@ Point d'entrée unique : render(df, df_hist, df_positions)
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from services.historique import build_total_evolution, build_category_evolution
+from services.historique import build_category_evolution
 from services.pricer import fetch_historical_prices
 from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD_OPTIONS, PERIOD_DEFAULT, BENCHMARK_OPTIONS, BENCHMARK_COLOR
 
@@ -59,7 +59,6 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
 
     with st.spinner("Reconstruction de l'historique…"):
         df_prices = fetch_historical_prices(tuple(auto_tickers), yf_period) if auto_tickers else pd.DataFrame()
-        total_evo = build_total_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
         cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
 
         df_benchmark = pd.DataFrame()
@@ -68,8 +67,6 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
 
     # Filtrage par période
     if start_date is not None:
-        if not total_evo.empty:
-            total_evo = total_evo[total_evo["date"] >= start_date]
         if not cat_evo.empty:
             cat_evo = cat_evo[cat_evo.index >= start_date]
         if not df_benchmark.empty:
@@ -89,12 +86,11 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     # Aucune sélection = toutes les catégories
     active_cats = selected_cats if selected_cats else options_cat
 
-    _render_chart(active_cats, total_evo, cat_evo, df_benchmark, benchmark_ticker, benchmark_label)
+    _render_chart(active_cats, cat_evo, df_benchmark, benchmark_ticker, benchmark_label)
 
 
 def _render_chart(
     active_cats: list[str],
-    total_evo: pd.DataFrame,
     cat_evo: pd.DataFrame,
     df_benchmark: pd.DataFrame,
     benchmark_ticker: str | None,
@@ -123,22 +119,26 @@ def _render_chart(
         benchmark_ticker
         and not df_benchmark.empty
         and benchmark_ticker in df_benchmark.columns
-        and not total_evo.empty
+        and active_cats
+        and not cat_evo.empty
     ):
+        # Somme des catégories actives comme référence (pas le total global)
+        cols_actives = [c for c in active_cats if c in cat_evo.columns]
+        active_total = cat_evo[cols_actives].sum(axis=1).rename("total")
+
         bench_series = df_benchmark[benchmark_ticker].dropna()
-        total_evo_indexed = total_evo.set_index("date")["total"]
-        first_patrimoine_date = total_evo_indexed.index[0]
-        bench_series = bench_series[bench_series.index >= first_patrimoine_date]
+        first_date = active_total.index[0]
+        bench_series = bench_series[bench_series.index >= first_date]
 
         if not bench_series.empty:
             ref_bench = float(bench_series.iloc[0])
-            candidates = total_evo_indexed[total_evo_indexed.index <= bench_series.index[0]]
+            candidates = active_total[active_total.index <= bench_series.index[0]]
             if candidates.empty:
-                candidates = total_evo_indexed
-            ref_patrimoine = float(candidates.iloc[-1])
+                candidates = active_total
+            ref_actif = float(candidates.iloc[-1])
 
             if ref_bench > 0:
-                bench_scaled = bench_series * (ref_patrimoine / ref_bench)
+                bench_scaled = bench_series * (ref_actif / ref_bench)
                 fig.add_trace(go.Scatter(
                     x=bench_scaled.index,
                     y=bench_scaled.values,
