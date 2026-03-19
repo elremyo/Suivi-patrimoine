@@ -17,6 +17,7 @@ from ui.asset_detail import set_asset_detail, is_asset_detail_active, get_curren
 from constants import CATEGORIES_ASSETS, CATEGORIES_AUTO, CATEGORY_COLOR_MAP
 from services.db_contrats import load_contrats
 from services.db_emprunts import load_emprunts
+from services.financial_calculations import calculate_rental_metrics, calculate_auto_asset_pnl
 
 
 # ── Ligne d'actif ─────────────────────────────────────────────────────────────
@@ -89,27 +90,13 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         if row["categorie"] == "Immobilier":
             # ── Métriques locatives ───────────────────────────────────────────
             if row.get("usage") == "locatif":
-                loyer = float(row.get("loyer_mensuel") or 0)
-                charges = float(row.get("charges_mensuelles") or 0)
-                taxe = float(row.get("taxe_fonciere_annuelle") or 0)
-                cout_reel = (
-                    float(row.get("prix_achat") or 0)
-                    + float(row.get("frais_notaire") or 0)
-                    + float(row.get("montant_travaux") or 0)
-                )
-                mensualite = 0.0
-                emprunt_id = row.get("emprunt_id")
-                if emprunt_id and df_emprunts is not None and not pd.isna(emprunt_id):
-                    emp = df_emprunts[df_emprunts["id"] == str(emprunt_id)]
-                    if not emp.empty:
-                        mensualite = float(emp.iloc[0]["mensualite"])
-
+                metrics = calculate_rental_metrics(row)
+                
                 loc_parts = []
-                if loyer > 0 and cout_reel > 0:
-                    rendement_brut = (loyer-charges) * 12 / cout_reel * 100
-                    loc_parts.append(f"{rendement_brut:.1f} % brut")
-                if loyer > 0:
-                    cashflow = loyer - charges - taxe / 12 - mensualite
+                if row.get("loyer_mensuel", 0) > 0 and metrics["cout_reel"] > 0:
+                    loc_parts.append(f"{metrics['rendement_brut']:.1f} % brut")
+                if row.get("loyer_mensuel", 0) > 0:
+                    cashflow = metrics["cashflow_mensuel"]
                     sign = "+" if cashflow >= 0 else ""
                     color = "green" if cashflow >= 0 else "red"
                     loc_parts.append(f"Cashflow : :{color}[**{sign}{cashflow:.0f} €/m**]")
@@ -125,9 +112,9 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
 
     # ── PnL (actifs auto avec PRU) ────────────────────────────────────────────
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
-        valeur_achat = row["pru"] * row["quantite"]
-        pnl = row["montant"] - valeur_achat
-        pnl_pct = (pnl / valeur_achat * 100) if valeur_achat else 0
+        pnl_metrics = calculate_auto_asset_pnl(row["montant"], row["pru"], row["quantite"])
+        pnl = pnl_metrics["pnl_absolu"]
+        pnl_pct = pnl_metrics["pnl_pct"]
         sign_color = "green" if pnl >= 0 else "red"
         sign = "+" if pnl >= 0 else ""
         sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
@@ -190,8 +177,15 @@ def render(df: pd.DataFrame, invalidate_cache_fn, flash_fn) -> pd.DataFrame:
 
     with st.container(vertical_alignment="center"):
         if has_pnl:
-            valeur_achat_totale = (df_auto["pru"] * df_auto["quantite"]).sum()
-            pnl_global = df_auto["montant"].sum() - valeur_achat_totale
+            pnl_global = 0.0
+            valeur_achat_totale = 0.0
+            
+            for _, asset in df_auto.iterrows():
+                if asset.get("pru", 0) > 0 and asset.get("quantite", 0) > 0:
+                    pnl_metrics = calculate_auto_asset_pnl(asset["montant"], asset["pru"], asset["quantite"])
+                    pnl_global += pnl_metrics["pnl_absolu"]
+                    valeur_achat_totale += pnl_metrics["valeur_achat"]
+            
             pnl_pct = (pnl_global / valeur_achat_totale * 100) if valeur_achat_totale else 0
             sign = "+" if pnl_global >= 0 else ""
             st.metric(label="Total actifs", value=f"{total:,.2f} €",delta=f"{sign}{pnl_global:,.2f} € ({sign}{pnl_pct:.1f}%)")

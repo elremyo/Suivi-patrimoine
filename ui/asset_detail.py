@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from services.pricer import fetch_historical_prices, get_price, get_name
 from constants import PERIOD_OPTIONS, PERIOD_DEFAULT, PLOTLY_LAYOUT, CATEGORIES_AUTO, CACHE_TTL_SECONDS
+from services.financial_calculations import calculate_rental_metrics, calculate_investment_performance, calculate_auto_asset_pnl
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def get_asset_info(ticker: str) -> dict:
@@ -170,7 +171,6 @@ def render_asset_info(asset_info: dict):
 def _render_immo_detail(asset: pd.Series):
     """Page de détail pour un bien immobilier."""
     from services.db_emprunts import load_emprunts
-
     # ── Bouton retour + titre ─────────────────────────────────────────────────
     with st.container(horizontal=True, vertical_alignment="bottom"):
         if st.button("← Retour", key="btn_back_immo", type="secondary"):
@@ -209,9 +209,11 @@ def _render_immo_detail(asset: pd.Series):
         prix_achat = float(asset.get("prix_achat") or 0)
         frais_notaire = float(asset.get("frais_notaire") or 0)
         montant_travaux = float(asset.get("montant_travaux") or 0)
-        cout_reel = prix_achat + frais_notaire + montant_travaux
-        plus_value = valeur_actuelle - cout_reel
-        pv_pct = (plus_value / cout_reel * 100) if cout_reel > 0 else 0
+        
+        performance = calculate_investment_performance(prix_achat, frais_notaire, montant_travaux, valeur_actuelle)
+        cout_reel = performance["cout_reel"]
+        plus_value = performance["plus_value"]
+        pv_pct = performance["plus_value_pct"]
 
         c1, c2, c3, c4 = st.columns(4)
         c1.caption("Valeur actuelle")
@@ -257,13 +259,15 @@ def _render_immo_detail(asset: pd.Series):
 
     # ── Bloc 4 : Rendement locatif ────────────────────────────────────────────
     if asset.get("usage") == "locatif":
-        loyer = float(asset.get("loyer_mensuel") or 0)
-        charges = float(asset.get("charges_mensuelles") or 0)
-        taxe = float(asset.get("taxe_fonciere_annuelle") or 0)
-
+        metrics = calculate_rental_metrics(asset)
+        
         st.subheader("Rendement locatif", anchor=False)
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
+            loyer = float(asset.get("loyer_mensuel") or 0)
+            charges = float(asset.get("charges_mensuelles") or 0)
+            taxe = float(asset.get("taxe_fonciere_annuelle") or 0)
+            
             c1.caption("Loyer mensuel brut")
             c1.markdown(f"{loyer:,.0f} €" if loyer > 0 else "—")
             c2.caption("Charges mensuelles")
@@ -274,17 +278,12 @@ def _render_immo_detail(asset: pd.Series):
             if loyer > 0:
                 st.divider()
                 c1, c2 = st.columns(2)
-                if cout_reel > 0:
-                    rendement_brut = loyer * 12 / cout_reel * 100
+                if metrics["cout_reel"] > 0:
+                    rendement_brut = metrics["rendement_brut"]
                     c1.caption("Rendement brut", help="Loyer annuel ÷ coût réel d'acquisition")
                     c1.markdown(f"{rendement_brut:.2f} %")
-                mensualite_emp = 0.0
-                if emprunt_id and not pd.isna(emprunt_id):
-                    df_emprunts = load_emprunts()
-                    emp = df_emprunts[df_emprunts["id"] == str(emprunt_id)]
-                    if not emp.empty:
-                        mensualite_emp = float(emp.iloc[0]["mensualite"])
-                cashflow = loyer - charges - taxe / 12 - mensualite_emp
+                
+                cashflow = metrics["cashflow_mensuel"]
                 sign = "+" if cashflow >= 0 else ""
                 color = "green" if cashflow >= 0 else "red"
                 c2.caption("Cashflow mensuel")
@@ -362,19 +361,20 @@ def render_asset_detail(asset_id: str, df: pd.DataFrame):
     if asset.get("pru") and asset.get("quantite"):
         st.subheader("Performance dans votre portefeuille", anchor=False)
         
+        pnl_metrics = calculate_auto_asset_pnl(asset["montant"], asset["pru"], asset["quantite"])
+        
         col_perf1, col_perf2, col_perf3 = st.columns(3)
         
         # Valeur d'achat
-        valeur_achat = asset["pru"] * asset["quantite"]
-        col_perf1.metric("Valeur d'achat", f"{valeur_achat:,.2f} €")
+        col_perf1.metric("Valeur d'achat", f"{pnl_metrics['valeur_achat']:,.2f} €")
         
         # Valeur actuelle
         valeur_actuelle = asset["montant"]
         col_perf2.metric("Valeur actuelle", f"{valeur_actuelle:,.2f} €")
         
         # PnL
-        pnl = valeur_actuelle - valeur_achat
-        pnl_pct = (pnl / valeur_achat * 100) if valeur_achat > 0 else 0
+        pnl = pnl_metrics["pnl_absolu"]
+        pnl_pct = pnl_metrics["pnl_pct"]
         sign = "+" if pnl >= 0 else ""
         col_perf3.metric(
             "Plus/Moins-value",
