@@ -30,30 +30,11 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
 
     st.subheader("Évolution", anchor=False)
 
-    # ── Sélecteurs période + benchmark ───────────────────────────────────────
-    col_period, col_benchmark = st.columns([5, 2])
-
-    with col_period:
-        period_label = st.radio(
-            "Période",
-            options=list(PERIOD_OPTIONS.keys()),
-            index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
-            horizontal=True,
-            key="period_selector",
-        )
-
-    with col_benchmark:
-        benchmark_label = st.selectbox(
-            "Comparer avec",
-            options=list(BENCHMARK_OPTIONS.keys()),
-            index=0,
-            key="benchmark_selector",
-            help="Comparer avec un indice de référence."
-        )
-
-    yf_period, nb_jours = PERIOD_OPTIONS[period_label]
-    benchmark_ticker = BENCHMARK_OPTIONS[benchmark_label]
-
+    # ── Traitement des données avant création des widgets ───────────────────────────────
+    # Obtenir la période par défaut pour le traitement initial
+    default_period = PERIOD_DEFAULT
+    yf_period, nb_jours = PERIOD_OPTIONS[default_period]
+    
     start_date = None
     if nb_jours is not None:
         start_date = pd.Timestamp.today().normalize() - pd.Timedelta(days=nb_jours)
@@ -62,9 +43,60 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
         df_prices = fetch_historical_prices(tuple(auto_tickers), yf_period) if auto_tickers else pd.DataFrame()
         cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
 
-        df_benchmark = pd.DataFrame()
-        if benchmark_ticker:
-            df_benchmark = fetch_historical_prices((benchmark_ticker,), yf_period)
+    # ── Sélecteurs période + catégorie + benchmark ───────────────────────────────────────
+    # ── Sélecteurs période + catégorie + benchmark ───────────────────────────────────────
+    col_left, col_right = st.columns([0.8, 0.2])
+    
+    with col_left:
+        # Conteneur horizontal pour period et catégories
+        with st.container(horizontal=True):
+            period_label = st.radio(
+                "Période",
+                options=list(PERIOD_OPTIONS.keys()),
+                index=list(PERIOD_OPTIONS.keys()).index(PERIOD_DEFAULT),
+                horizontal=True,
+                key="period_selector",
+            )
+    
+            # Calculer les options de catégories disponibles
+            CATEGORIES_EXCLUES_GRAPHE = {"Immobilier"}
+            options_cat = [c for c in cat_evo.columns if c not in CATEGORIES_EXCLUES_GRAPHE] if not cat_evo.empty else []
+
+            # Afficher le segmented control avec les vraies options
+            selected_cats = st.segmented_control(
+                "Catégories",
+                options=options_cat,
+                selection_mode="multi",
+                key="cat_selector",
+            )
+ 
+    with col_right:
+        benchmark_label = st.selectbox(
+            "Comparer avec",
+            options=list(BENCHMARK_OPTIONS.keys()),
+            index=0,
+            key="benchmark_selector",
+            help="Comparer avec un indice de référence."
+        )
+
+    # Si la période a changé, retraiter les données
+    if period_label != default_period:
+        yf_period, nb_jours = PERIOD_OPTIONS[period_label]
+        
+        start_date = None
+        if nb_jours is not None:
+            start_date = pd.Timestamp.today().normalize() - pd.Timedelta(days=nb_jours)
+
+        with st.spinner("Reconstruction de l'historique…"):
+            df_prices = fetch_historical_prices(tuple(auto_tickers), yf_period) if auto_tickers else pd.DataFrame()
+            cat_evo = build_category_evolution(df, df_hist, df_positions, df_prices, tuple(CATEGORIES_AUTO))
+
+    benchmark_ticker = BENCHMARK_OPTIONS[benchmark_label]
+
+    # Récupérer les données du benchmark
+    df_benchmark = pd.DataFrame()
+    if benchmark_ticker:
+        df_benchmark = fetch_historical_prices((benchmark_ticker,), yf_period)
 
     # Filtrage par période
     if start_date is not None:
@@ -72,17 +104,6 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
             cat_evo = cat_evo[cat_evo.index >= start_date]
         if not df_benchmark.empty:
             df_benchmark = df_benchmark[df_benchmark.index >= start_date]
-
-    # ── Segmented control — catégories ───────────────────────────────────────
-    CATEGORIES_EXCLUES_GRAPHE = {"Immobilier"}
-    options_cat = [c for c in cat_evo.columns if c not in CATEGORIES_EXCLUES_GRAPHE] if not cat_evo.empty else []
-
-    selected_cats = st.segmented_control(
-        "Catégories",
-        options=options_cat,
-        selection_mode="multi",
-        key="cat_selector",
-    )
 
     # Aucune sélection = toutes les catégories
     active_cats = selected_cats if selected_cats else options_cat

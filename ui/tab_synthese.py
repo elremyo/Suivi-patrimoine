@@ -33,10 +33,10 @@ def _render_kpis(df: pd.DataFrame):
     total_passifs = get_total_emprunts()
     patrimoine_net = total_actifs - total_passifs
 
-    col_total, col_passifs, col_net = st.columns(3)
-    col_total.metric(label="Patrimoine brut", value=f"{total_actifs:,.2f} €")
-    col_passifs.metric(label="Total passifs (emprunts)", value=f"{total_passifs:,.2f} €")
-    col_net.metric(label="Patrimoine net", value=f"{patrimoine_net:,.2f} €")
+    with st.container(horizontal=True):
+        st.metric(label="Patrimoine brut", value=f"{total_actifs:,.2f} €")
+        st.metric(label="Total passifs (emprunts)", value=f"{total_passifs:,.2f} €")
+        st.metric(label="Patrimoine net", value=f"{patrimoine_net:,.2f} €")
 
 
 # ── Répartition actifs par catégorie (cartes) ────────────────────────────────
@@ -191,8 +191,6 @@ def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
 def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     total_actifs = compute_total(df) if not df.empty else 0.0
 
-    _render_kpis(df)
-
     if df.empty:
         with st.container(border=True):
             st.markdown("### Bienvenue sur ton suivi de patrimoine 👋")
@@ -204,18 +202,26 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
             st.markdown("**3. Suis l'évolution de ton patrimoine**")
             st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
 
-    _render_actifs(df)
 
-    df_emprunts = load_emprunts()
-    if not df_emprunts.empty:
+    col_principal, col_sidebar = st.columns([3, 1], gap="large")
+    with col_principal:
+        # ── Actifs
+        _render_actifs(df)
+
+        # ── Passifs
+        df_emprunts = load_emprunts()
+        if not df_emprunts.empty:
+            st.space()
+            _render_passifs(df_emprunts, total_actifs)
+
+    with col_sidebar:
+        # ── KPIs
+        _render_kpis(df)
+
+        # ── Contrats
         st.space()
-        _render_passifs(df_emprunts, total_actifs)
+        _render_contrats(df)
 
-    st.space()
-    _render_contrats(df)
-
-
-    # ── Évolution historique ──────────────────────────────────────────────────
-    st.space()
+    # ── Évolution historique
     render_historique(df, df_hist, df_positions)
  
