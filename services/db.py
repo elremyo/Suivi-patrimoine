@@ -102,6 +102,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.commit()
 
     # Migration 4 — suivi locatif
+    immo_cols = [row[1] for row in conn.execute("PRAGMA table_info(actifs_immobilier)").fetchall()]
     if "loyer_mensuel" not in immo_cols:
         conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN loyer_mensuel REAL DEFAULT 0")
         conn.execute("ALTER TABLE actifs_immobilier ADD COLUMN charges_mensuelles REAL DEFAULT 0")
