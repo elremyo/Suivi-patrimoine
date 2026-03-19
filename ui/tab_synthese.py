@@ -199,9 +199,6 @@ def render(df: pd.DataFrame):
             st.caption("Pour tes actions et cryptos, l'app récupère les cours en temps réel via Yahoo Finance.")
             st.markdown("**3. Suis l'évolution de ton patrimoine**")
             st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
-            if st.button("+ Ajouter mon premier actif", type="primary", use_container_width=True, key="btn_empty_state"):
-                set_dialog_create()
-                st.rerun()
 
     _render_repartition_actifs(df)
 
