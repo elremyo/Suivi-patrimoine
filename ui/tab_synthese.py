@@ -217,6 +217,5 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
 
     # ── Évolution historique ──────────────────────────────────────────────────
     st.space()
-    st.subheader("Évolution", anchor=False)
     render_historique(df, df_hist, df_positions)
  

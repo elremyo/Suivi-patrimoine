@@ -28,6 +28,8 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     if not has_history:
         return
 
+    st.subheader("Évolution", anchor=False)
+
     # ── Sélecteurs période + benchmark ───────────────────────────────────────
     col_period, col_benchmark = st.columns([5, 2])
 
