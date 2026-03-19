@@ -146,23 +146,40 @@ def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
 
     st.subheader("Passifs", anchor=False)
 
-    cols_entete = st.columns(repartition_columns)
-    cols_entete[1].caption("Part du patrimoine")
-    cols_entete[2].caption("Emprunté")
-    cols_entete[3].caption("Restant dû")
+    # Grouper les emprunts par catégorie "Emprunts"
+    total_emprunts = df_emprunts["capital_restant_du"].fillna(0).sum()
+    total_emprunte = df_emprunts["montant_emprunte"].sum()
+    
+    # En-tête de la liste
+    header_cols = st.columns(repartition_columns)
+    header_cols[0].empty()
+    header_cols[1].caption("Répartition")
+    header_cols[2].caption("Emprunté")
+    header_cols[3].caption("Restant dû")
 
-    for _, row in df_emprunts.iterrows():
-        crd = row.get("capital_restant_du")
-        crd_str = f"{crd:,.0f} €" if crd is not None and not pd.isna(crd) else "—"
-        pct = (crd / total_actifs * 100) if (total_actifs > 0 and crd is not None and not pd.isna(crd)) else None
-        pct_str = f"{pct:.1f} %" if pct is not None else "—"
+    # Affichage de la catégorie Emprunts
+    color = CATEGORY_COLOR_MAP.get("Emprunts", "#75cbd1")
+    pct = (total_emprunts / total_actifs * 100) if total_actifs > 0 else 0
 
-        with st.container(border=True):
-            cols = st.columns(repartition_columns)
-            cols[0].markdown(f"**{row['nom']}**")
-            cols[1].write(pct_str)
-            cols[2].write(f"{row['montant_emprunte']:,.0f} €")
-            cols[3].write(crd_str)
+    with st.container(border=True):
+        cols = st.columns(repartition_columns)
+
+        # Nom coloré
+        cols[0].markdown(
+            f"<span style='color:{color}; font-size:0.85em;'>●</span> "
+            f"<span style='color:{color}; font-size:0.85em; text-transform:uppercase; "
+            f"letter-spacing:0.08em;'>Emprunts</span>",
+            unsafe_allow_html=True,
+        )
+
+        # Répartition %
+        cols[1].write(f"{pct:.1f} %")
+
+        # Total emprunté
+        cols[2].write(f"{total_emprunte:,.0f} €")
+
+        # Total restant dû
+        cols[3].write(f"{total_emprunts:,.0f} €")
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
