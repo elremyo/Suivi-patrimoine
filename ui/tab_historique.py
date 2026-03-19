@@ -93,7 +93,7 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     selected = st.multiselect(
         "Catégories à afficher",
         options=all_options,
-        default=["Total patrimoine"],
+        default=options_cat if options_cat else ["Total patrimoine"],
         placeholder="Choisir au moins une catégorie…",
     )
 
@@ -116,22 +116,31 @@ def _render_chart(
     """Construit et affiche le graphique Plotly des séries sélectionnées."""
     fig = go.Figure()
 
-    for serie in selected:
-        if serie == "Total patrimoine" and not total_evo.empty:
-            fig.add_trace(go.Scatter(
-                x=total_evo["date"], y=total_evo["total"],
-                mode="lines+markers", name=serie,
-                line=dict(color="#E8EAF0", width=2),
-                marker=dict(size=5),
-            ))
-        elif serie in options_cat and not cat_evo.empty and serie in cat_evo.columns:
+    selected_cats = [s for s in selected if s in options_cat]
+    show_total = "Total patrimoine" in selected
+    use_stacked = bool(selected_cats)
+
+    # ── Aires empilées (catégories) ───────────────────────────────────────────
+    if use_stacked and not cat_evo.empty:
+        for serie in selected_cats:
+            if serie not in cat_evo.columns:
+                continue
             color = CATEGORY_COLOR_MAP.get(serie, "#CCCCCC")
             fig.add_trace(go.Scatter(
                 x=cat_evo.index, y=cat_evo[serie],
-                mode="lines+markers", name=serie,
-                line=dict(color=color, width=2),
-                marker=dict(size=5),
+                mode="lines", name=serie,
+                stackgroup="patrimoine",
+                line=dict(color=color, width=1),
+                fillcolor=color,
             ))
+
+    # ── Ligne total (par-dessus les aires, ou seule) ──────────────────────────
+    if show_total and not total_evo.empty:
+        fig.add_trace(go.Scatter(
+            x=total_evo["date"], y=total_evo["total"],
+            mode="lines", name="Total patrimoine",
+            line=dict(color="#E8EAF0", width=2, dash="dot" if use_stacked else "solid"),
+        ))
 
     # ── Indice de comparaison ─────────────────────────────────────────────────
     if (
@@ -176,8 +185,5 @@ def _render_chart(
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
                     bgcolor="rgba(0,0,0,0)", font=dict(color="#E8EAF0")),
     )
-    fig.update_yaxes(
-        ticksuffix=" €",
-        tickformat=",.0f"
-    )
+    fig.update_yaxes(ticksuffix=" €", tickformat=",.0f")
     st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
