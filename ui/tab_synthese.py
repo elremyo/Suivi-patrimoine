@@ -17,6 +17,7 @@ from services.db_emprunts import get_total_emprunts, load_emprunts
 from services.db_contrats import load_contrats
 from constants import CATEGORY_COLOR_MAP, CATEGORIES_AUTO, PLOTLY_LAYOUT
 from ui.asset_form import set_dialog_create
+from ui.graphe_historique import render as render_historique
 
 
 repartition_columns = [5, 1, 1, 2]
@@ -187,7 +188,7 @@ def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
-def render(df: pd.DataFrame):
+def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     total_actifs = compute_total(df) if not df.empty else 0.0
 
     _render_kpis(df)
@@ -212,3 +213,10 @@ def render(df: pd.DataFrame):
 
     st.space()
     _render_contrats(df)
+
+
+    # ── Évolution historique ──────────────────────────────────────────────────
+    st.space()
+    st.subheader("Évolution", anchor=False)
+    render_historique(df, df_hist, df_positions)
+ 

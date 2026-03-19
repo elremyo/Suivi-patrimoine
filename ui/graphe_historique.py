@@ -1,7 +1,7 @@
 """
-ui/tab_historique.py
+ui/graphe_historique.py
 ───────────────────────
-Contenu du tab "📈 Historique" : sélecteur de période, courbes d'évolution
+Affiche l'historique du patrimoine : sélecteur de période, courbes d'évolution
 du patrimoine total et par catégorie.
 
 Point d'entrée unique : render(df, df_hist, df_positions)
@@ -26,7 +26,6 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     has_history = not df_hist.empty or (not df_positions.empty and bool(auto_tickers))
 
     if not has_history:
-        st.info("Aucun historique disponible. Ajoute des actifs et mets à jour leurs montants pour construire un historique.")
         return
 
     # ── Sélecteurs période + benchmark ───────────────────────────────────────

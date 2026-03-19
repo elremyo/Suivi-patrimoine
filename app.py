@@ -14,7 +14,6 @@ from services.positions import init_positions, load_positions
 from ui.tab_synthese import render as render_synthese
 from ui.tab_actifs import render as render_actifs
 from ui.tab_emprunts import render as render_emprunts
-from ui.tab_historique import render as render_historique
 from ui.tab_parametres import render as render_parametres
 from ui.asset_form import render_active_dialog, set_dialog_create
 from ui.forms.form_emprunt import set_emprunt_dialog_create, render_emprunt_dialog
@@ -124,21 +123,18 @@ with st.container(horizontal=True, vertical_alignment="bottom"):
             st.rerun()
 
 
-tab_synthese, tab_actifs, tab_passifs, tab_historique, tab_params = st.tabs([
-    "Synthèse", "Actifs", "Passifs", "Historique", "Paramètres"
+tab_synthese, tab_actifs, tab_passifs, tab_params = st.tabs([
+    "Synthèse", "Actifs", "Passifs", "Paramètres"
 ])
 
 with tab_synthese:
-    render_synthese(df)
+    render_synthese(df, df_hist, df_positions)
 
 with tab_actifs:
     render_actifs(df, invalidate_data_cache, flash)
 
 with tab_passifs:
     render_emprunts(flash)
-
-with tab_historique:
-    render_historique(df, df_hist, df_positions)
 
 with tab_params:
     render_parametres(df, invalidate_data_cache)
