@@ -121,14 +121,17 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
     # ── Bouton mise à jour datée ──────────────────────────────────────────────
-    if cols[4].button(
-        "",
-        key=f"upd_{row['id']}",
-        icon=":material/history:",
-        help="Mettre à jour à une date",
-    ):
-        set_dialog_update(row["id"])
-        st.rerun()
+    if row["categorie"] == "Immobilier":
+        cols[4].empty()
+    else:
+        if cols[4].button(
+            "",
+            key=f"upd_{row['id']}",
+            icon=":material/history:",
+            help="Mettre à jour à une date",
+        ):
+            set_dialog_update(row["id"])
+            st.rerun()
 
     # ── Boutons édition / suppression ─────────────────────────────────────────
     if cols[5].button("", key=f"mod_{row['id']}", icon=":material/edit_square:", help="Modifier l'actif"):
