@@ -12,6 +12,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import yfinance as yf
 from services.pricer import fetch_historical_prices, get_price, get_name
+from services.db_emprunts import load_emprunts
+from ui.asset_form import set_dialog_edit
 from constants import PERIOD_OPTIONS, PERIOD_DEFAULT, PLOTLY_LAYOUT, CATEGORIES_AUTO, CACHE_TTL_SECONDS
 from services.financial_calculations import calculate_rental_metrics, calculate_investment_performance, calculate_auto_asset_pnl
 
@@ -170,7 +172,19 @@ def render_asset_info(asset_info: dict):
 
 def _render_immo_detail(asset: pd.Series):
     """Page de détail pour un bien immobilier."""
-    from services.db_emprunts import load_emprunts
+
+    # Recharger les données fraîches depuis la base pour éviter les problèmes de cache
+    from services.assets import get_assets
+    fresh_df = get_assets()
+    fresh_asset_row = fresh_df[fresh_df["id"] == asset["id"]]
+    
+    if fresh_asset_row.empty:
+        st.error(f"Actif avec ID {asset['id']} introuvable")
+        return
+    
+    asset = fresh_asset_row.iloc[0]
+
+
     # ── Bouton retour + titre ─────────────────────────────────────────────────
     with st.container(horizontal=True, vertical_alignment="bottom"):
         if st.button("← Retour", key="btn_back_immo", type="secondary"):
@@ -179,13 +193,17 @@ def _render_immo_detail(asset: pd.Series):
             st.rerun()
         usage_label = "Résidence principale" if asset.get("usage") == "residence_principale" else "Locatif"
         st.header(f"{asset['nom']}", anchor=False)
+
+        if st.button("Modifier", key="btn_edit_immo", type="secondary", icon=":material/edit:"):
+            set_dialog_edit(asset["id"])
+            st.rerun()
     
     st.divider()
 
     # ── Bloc 1 : Identité ─────────────────────────────────────────────────────
     st.subheader("Identité du bien", anchor=False)
     with st.container(border=True):
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5 = st.columns(5)
         type_bien_key = str(asset.get("type_bien") or "autre").strip().lower()
         type_bien_display = TYPE_BIEN_OPTIONS.get(type_bien_key, str(asset.get("type_bien") or "—").capitalize())
         c1.caption("Type")
@@ -194,11 +212,23 @@ def _render_immo_detail(asset: pd.Series):
         superficie = asset.get("superficie_m2")
         c2.caption("Superficie")
         c2.markdown(f"{float(superficie):.0f} m²" if superficie and float(superficie) > 0 else "—")
+
         c3.caption("Usage")
         c3.markdown(usage_label)
+
         adresse = str(asset.get("adresse") or "—").strip()
         c4.caption("Adresse")
         c4.markdown(adresse if adresse else "—")
+
+        c5.caption("Date d'achat")
+        date_achat = asset.get("date_achat")
+        c5.markdown(date_achat if date_achat else "—")
+
+        #afficher les notes en italique
+        notes = asset.get("notes")
+        if notes and notes.strip():
+            st.caption("Notes")
+            st.markdown(f"*{notes.strip()}*")
 
     st.space(size="small")
 
@@ -216,15 +246,18 @@ def _render_immo_detail(asset: pd.Series):
         pv_pct = performance["plus_value_pct"]
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.caption("Valeur actuelle")
-        c1.markdown(f"{valeur_actuelle:,.0f} €")
-        c2.caption("Prix d'achat")
-        c2.markdown(f"{prix_achat:,.0f} €")
+        c1.caption("Prix d'achat")
+        c1.markdown(f"{prix_achat:,.0f} €")
+
         notaire_str = f"dont {frais_notaire:,.0f} € notaire" if frais_notaire > 0 else ""
         travaux_str = f"+ {montant_travaux:,.0f} € travaux" if montant_travaux > 0 else ""
-        detail_cout = " · ".join(filter(None, [notaire_str, travaux_str]))
-        c3.caption("Coût réel")
-        c3.markdown(f"{cout_reel:,.0f} €", help=detail_cout if detail_cout else None)
+        detail_cout = "".join(filter(None, [notaire_str, travaux_str]))
+        c2.caption("Coût réel")
+        c2.markdown(f"{cout_reel:,.0f} €", help=detail_cout if detail_cout else None)
+
+        c3.caption("Valeur actuelle")
+        c3.markdown(f"{valeur_actuelle:,.0f} €")
+
         sign = "+" if plus_value >= 0 else ""
         color = "green" if plus_value >= 0 else "red"
         c4.caption("Plus-value latente")
@@ -263,31 +296,33 @@ def _render_immo_detail(asset: pd.Series):
         
         st.subheader("Rendement locatif", anchor=False)
         with st.container(border=True):
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4, c5 = st.columns(5)
             loyer = float(asset.get("loyer_mensuel") or 0)
             charges = float(asset.get("charges_mensuelles") or 0)
             taxe = float(asset.get("taxe_fonciere_annuelle") or 0)
             
             c1.caption("Loyer mensuel brut")
             c1.markdown(f"{loyer:,.0f} €" if loyer > 0 else "—")
+            
             c2.caption("Charges mensuelles")
             c2.markdown(f"{charges:,.0f} €" if charges > 0 else "—")
+            
             c3.caption("Taxe foncière")
             c3.markdown(f"{taxe:,.0f} €/an" if taxe > 0 else "—")
 
-            if loyer > 0:
-                st.divider()
-                c1, c2 = st.columns(2)
-                if metrics["cout_reel"] > 0:
-                    rendement_brut = metrics["rendement_brut"]
-                    c1.caption("Rendement brut", help="Loyer annuel ÷ coût réel d'acquisition")
-                    c1.markdown(f"{rendement_brut:.2f} %")
+            rendement_brut = metrics["rendement_brut"]
+            c4.caption("Rendement brut", help="Loyer annuel ÷ coût réel d'acquisition")
+            c4.markdown(f"{rendement_brut:.2f} %" if rendement_brut > 0 else "—")
+
+            cashflow = metrics["cashflow_mensuel"]
+            sign = "+" if cashflow >= 0 else ""
+            color = "green" if cashflow >= 0 else "red"
+            c5.caption("Cashflow mensuel")
+            c5.markdown(f":{color}-badge[{sign}{cashflow:,.0f} €]")
+
+
                 
-                cashflow = metrics["cashflow_mensuel"]
-                sign = "+" if cashflow >= 0 else ""
-                color = "green" if cashflow >= 0 else "red"
-                c2.caption("Cashflow mensuel")
-                c2.markdown(f":{color}-badge[{sign}{cashflow:,.0f} €]")
+
 
 
 
