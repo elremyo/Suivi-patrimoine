@@ -25,6 +25,9 @@ repartition_columns = [5, 1, 1, 2]
 # ── Métriques clés ────────────────────────────────────────────────────────────
 
 def _render_kpis(df: pd.DataFrame):
+    if df.empty:
+        return
+
     total_actifs = compute_total(df) if not df.empty else 0.0
     total_passifs = get_total_emprunts()
     patrimoine_net = total_actifs - total_passifs
@@ -37,7 +40,7 @@ def _render_kpis(df: pd.DataFrame):
 
 # ── Répartition actifs par catégorie (cartes) ────────────────────────────────
 
-def _render_repartition_actifs(df: pd.DataFrame):
+def _render_actifs(df: pd.DataFrame):
     stats = compute_by_category(df)
     if stats.empty:
         return
@@ -200,7 +203,7 @@ def render(df: pd.DataFrame):
             st.markdown("**3. Suis l'évolution de ton patrimoine**")
             st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
 
-    _render_repartition_actifs(df)
+    _render_actifs(df)
 
     df_emprunts = load_emprunts()
     if not df_emprunts.empty:
