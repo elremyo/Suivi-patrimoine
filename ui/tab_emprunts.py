@@ -14,6 +14,10 @@ import plotly.graph_objects as go
 from datetime import date
 from constants import PLOTLY_LAYOUT
 
+
+repartition_columns = [6, 3, 1, 2, 2, 2, 0.5, 0.5]
+
+
 def _build_crd_evolution(df: pd.DataFrame) -> pd.DataFrame:
     """Calcule le CRD total mois par mois jusqu'à extinction du dernier emprunt."""
     from services.db_emprunts import _compute_capital_restant_du
@@ -69,8 +73,8 @@ def _render_crd_chart(df: pd.DataFrame) -> None:
     st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
 
 def _render_emprunt_row(row: pd.Series):
-    cols = st.columns([6, 3, 1, 2, 2, 2, 0.5, 0.5])
 
+    cols = st.columns(repartition_columns)
     # Nom
     cols[0].write(row["nom"])
     date_debut = row.get("date_debut")
@@ -157,48 +161,50 @@ def render(flash_fn) -> None:
     revenu_val = float(revenu) if revenu else None
     taux_endettement = (total_mensualites / revenu_val * 100) if revenu_val and revenu_val > 0 else None
 
-    with st.container(horizontal=True):
-        st.metric("Total emprunté", f"{total_emprunte:,.0f} €", border=True)
-        st.metric("Mensualités / mois", f"{total_mensualites:,.0f} €", border=True)
-        st.metric("Capital restant dû", f"{total_crd:,.0f} €", border=True)
-        st.metric("Intérêts restants", f"{total_interets_restants:,.0f} €", border=True)
-        if taux_endettement is not None:
-            alerte = ":red[:material/error:]" if taux_endettement > 35 else ":orange[:material/warning:]" if taux_endettement > 30 else ":green[:material/check_circle:]"
-            st.metric(
-                "Taux d'endettement",
-                f"{alerte} {taux_endettement:.1f} %",
-                border=True,
-                help="Mensualités ÷ revenus nets. Seuil bancaire : 35 %."
-            )
-        else:
-            st.metric(
-                "Taux d'endettement",
-                "?",
-                border=True,
-                help="Renseigne ton revenu mensuel net dans Paramètres pour voir ce calcul."
-            )
-    st.space(size="small")
+    col_principal, col_sidebar = st.columns([3, 1], gap="large")
+    with col_principal:
+        # ── Graphique évolution CRD 
+        if not df.empty:
+            _render_crd_chart(df)
 
-    # ── Graphique évolution CRD ───────────────────────────────────────────────
-    if not df.empty:
-        _render_crd_chart(df)
+        st.space(size="medium")
 
-    st.space(size="small")
+        if df.empty:
+            st.info("Aucun emprunt pour l'instant. Ajoute un prêt immobilier, un crédit conso, etc.")
+            return
+            
+        # ── En-tête des colonnes 
+        header_cols = st.columns(repartition_columns)
+        header_cols[0].empty()
+        header_cols[1].caption("Montant emprunté")
+        header_cols[2].caption("Taux")
+        header_cols[3].caption("Mensualité")
+        header_cols[4].caption("Restant dû")
+        header_cols[5].caption("Remboursé")
 
-    if df.empty:
-        st.info("Aucun emprunt pour l'instant. Ajoute un prêt immobilier, un crédit conso, etc.")
-        return
+        # ── Liste des emprunts 
+        for _, row in df.iterrows():
+            with st.container(border=True, vertical_alignment="center"):
+                _render_emprunt_row(row)
 
-    # ── En-tête des colonnes ──────────────────────────────────────────────────
-    header_cols = st.columns([6, 3, 1, 2, 2, 2, 0.5, 0.5])
-    header_cols[0].empty()
-    header_cols[1].caption("Montant emprunté")
-    header_cols[2].caption("Taux")
-    header_cols[3].caption("Mensualité")
-    header_cols[4].caption("Restant dû")
-    header_cols[5].caption("Remboursé")
-
-    # ── Liste des emprunts ────────────────────────────────────────────────────
-    for _, row in df.iterrows():
-        with st.container(border=True, vertical_alignment="center"):
-            _render_emprunt_row(row)
+    with col_sidebar:
+        with st.container(horizontal=True):
+            st.metric("Total emprunté", f"{total_emprunte:,.0f} €", border=True)
+            st.metric("Mensualités / mois", f"{total_mensualites:,.0f} €", border=True)
+            st.metric("Capital restant dû", f"{total_crd:,.0f} €", border=True)
+            st.metric("Intérêts restants", f"{total_interets_restants:,.0f} €", border=True)
+            if taux_endettement is not None:
+                alerte = ":red[:material/error:]" if taux_endettement > 35 else ":orange[:material/warning:]" if taux_endettement > 30 else ":green[:material/check_circle:]"
+                st.metric(
+                    "Taux d'endettement",
+                    f"{alerte} {taux_endettement:.1f} %",
+                    border=True,
+                    help="Mensualités ÷ revenus nets. Seuil bancaire : 35 %."
+                )
+            else:
+                st.metric(
+                    "Taux d'endettement",
+                    "?",
+                    border=True,
+                    help="Renseigne ton revenu mensuel net dans Paramètres pour voir ce calcul."
+                )

@@ -33,7 +33,7 @@ def _render_kpis(df: pd.DataFrame):
     total_passifs = get_total_emprunts()
     patrimoine_net = total_actifs - total_passifs
 
-    with st.container(horizontal=True):
+    with st.container(horizontal=False, border=True):
         st.metric(label="Patrimoine brut", value=f"{total_actifs:,.2f} €")
         st.metric(label="Total passifs (emprunts)", value=f"{total_passifs:,.2f} €")
         st.metric(label="Patrimoine net", value=f"{patrimoine_net:,.2f} €")
@@ -133,7 +133,7 @@ def _render_contrats(df: pd.DataFrame):
         )
         
         st.subheader("Actifs par contrat", anchor=False)
-        with st.container(horizontal=True):
+        with st.container(horizontal=False):
             for contrat, montant in totaux.items():
                 st.metric(label=contrat, value=f"{montant:,.2f} €", border=True)
                 
@@ -202,26 +202,30 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
             st.markdown("**3. Suis l'évolution de ton patrimoine**")
             st.caption("Visualise la répartition de tes actifs et leur évolution dans le temps.")
 
+    else:
+        col_principal, col_sidebar = st.columns([3, 1], gap="large")
+        with col_principal:
+            # ── Actifs
+            _render_actifs(df)
 
-    col_principal, col_sidebar = st.columns([3, 1], gap="large")
-    with col_principal:
-        # ── Actifs
-        _render_actifs(df)
+            # ── Passifs
+            df_emprunts = load_emprunts()
+            if not df_emprunts.empty:
+                st.space()
+                _render_passifs(df_emprunts, total_actifs)
 
-        # ── Passifs
-        df_emprunts = load_emprunts()
-        if not df_emprunts.empty:
-            st.space()
-            _render_passifs(df_emprunts, total_actifs)
+            # ── Évolution historique
+            render_historique(df, df_hist, df_positions)
 
-    with col_sidebar:
-        # ── KPIs
-        _render_kpis(df)
+        with col_sidebar:
+            with st.container(border=False):
+                # ── KPIs
+                st.subheader("Patrimoine")
+                st.caption("Répartition et évolution")
+                _render_kpis(df)
 
-        # ── Contrats
-        st.space()
-        _render_contrats(df)
+                # ── Contrats
+                st.space()
+                _render_contrats(df)
 
-    # ── Évolution historique
-    render_historique(df, df_hist, df_positions)
  

@@ -17,6 +17,7 @@ from constants import CATEGORIES_AUTO, CATEGORY_COLOR_MAP, PLOTLY_LAYOUT, PERIOD
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
 
+@st.fragment
 def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
     auto_tickers = sorted(
         df[df["categorie"].isin(CATEGORIES_AUTO) & (df["ticker"] != "")]["ticker"]

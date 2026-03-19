@@ -105,7 +105,7 @@ show_flash()
 
 st.logo(image=":material/finance_mode:", size="large", icon_image=":material/finance_mode:")
 
-with st.container(horizontal=True, vertical_alignment="bottom"):
+with st.container(horizontal=True, vertical_alignment="bottom", horizontal_alignment="right"):
     st.title("Suivi de patrimoine", anchor=False)
     with st.popover("Compléter mon patrimoine", type="primary", icon=":material/add:"):
         for label, icon, categorie in [
