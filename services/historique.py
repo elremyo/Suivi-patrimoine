@@ -159,7 +159,7 @@ def _compute_raw_evolution(
             parts.append(merged[["date", "asset_id", "nom", "categorie", "valeur"]])
 
     if not auto_assets.empty and not df_prices.empty and not df_positions.empty:
-        prices_long = df_prices.stack().reset_index()
+        prices_long = df_prices.ffill().bfill().stack().reset_index()
         prices_long.columns = ["date", "ticker", "price"]
         prices_long["date"] = pd.to_datetime(prices_long["date"]).dt.normalize()
         prices_long = prices_long.sort_values("date")
