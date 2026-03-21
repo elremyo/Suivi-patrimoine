@@ -161,7 +161,7 @@ def render_delete_data(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
                 invalidate_cache_fn()
                 st.rerun()
 
-def _render_profil(invalidate_cache_fn=None):
+def _render_profil(invalidate_cache_fn=None, flash_fn=None):
     from services.db_parametres import get_parametre, set_parametre
 
     with st.expander("Mon profil",icon = ":material/person:"):
@@ -181,14 +181,15 @@ def _render_profil(invalidate_cache_fn=None):
             submitted = st.form_submit_button("Enregistrer", type="primary")
             if submitted:
                 set_parametre("revenu_mensuel_net", revenu)
-                st.toast("Revenu enregistré.", icon="✅")
+                if flash_fn:
+                    flash_fn("Revenu enregistré.")
                 st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
-def render(df: pd.DataFrame, invalidate_cache_fn=None):
+def render(df: pd.DataFrame, invalidate_cache_fn=None, flash_fn=None):
     # ── Section Profil ───────────────────────────────────────────────────────
-    _render_profil()
+    _render_profil(invalidate_cache_fn, flash_fn)
 
     st.divider()
 
@@ -198,4 +199,4 @@ def render(df: pd.DataFrame, invalidate_cache_fn=None):
     st.divider()
     
     # ── Section Suppression données ──────────────────────────────────────────
-    render_delete_data(df, invalidate_cache_fn, st.toast)
+    render_delete_data(df, invalidate_cache_fn, flash_fn or st.toast)

@@ -137,4 +137,4 @@ with tab_passifs:
     render_emprunts(flash)
 
 with tab_params:
-    render_parametres(df, invalidate_data_cache)
+    render_parametres(df, invalidate_data_cache, flash)
