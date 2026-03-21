@@ -19,7 +19,9 @@ def _schema_path() -> str:
 
 def get_conn() -> sqlite3.Connection:
     """Retourne une connexion à la base SQLite."""
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
 @contextmanager
