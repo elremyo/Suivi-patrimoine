@@ -24,7 +24,7 @@ from services.financial_calculations import calculate_rental_metrics, calculate_
 
 def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_emprunts: pd.DataFrame = None):    
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 2, 0.5, 0.5, 0.5], vertical_alignment="center")
+    cols = st.columns([4, 2, 2, 2, 0.5], vertical_alignment="center")
 
     # ── Colonne nom + infos discrètes ─────────────────────────────────────────
     contrat_id_val = row.get("contrat_id", "")
@@ -108,7 +108,21 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         cols[1].caption(f'{row["quantite"]:g} unités')
 
     # ── Montant ───────────────────────────────────────────────────────────────
-    cols[2].write(f"{row['montant']:,.2f} €")
+    with cols[2].container(horizontal=True, width="content", vertical_alignment="center"):
+        if row["categorie"] == "Immobilier":
+            st.empty()
+        else:
+            if st.button(
+                "",
+                key=f"upd_{row['id']}",
+                icon=":material/history:",
+                help="Mettre à jour à une date",
+                type="tertiary"
+            ):
+                set_dialog_update(row["id"])
+                st.rerun()
+        st.write(f"{row['montant']:,.2f} €")
+
 
     # ── PnL (actifs auto avec PRU) ────────────────────────────────────────────
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
@@ -120,27 +134,16 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         sign_icon = ":material/trending_up:" if pnl >= 0 else ":material/trending_down:"
         cols[3].markdown(f":{sign_color}-badge[{sign_icon} {sign}{pnl:,.2f} € ({sign}{pnl_pct:.1f}%)]")
 
-    # ── Bouton mise à jour datée ──────────────────────────────────────────────
-    if row["categorie"] == "Immobilier":
-        cols[4].empty()
-    else:
-        if cols[4].button(
-            "",
-            key=f"upd_{row['id']}",
-            icon=":material/history:",
-            help="Mettre à jour à une date",
-        ):
-            set_dialog_update(row["id"])
-            st.rerun()
 
     # ── Boutons édition / suppression ─────────────────────────────────────────
-    if cols[5].button("", key=f"mod_{row['id']}", icon=":material/edit_square:", help="Modifier l'actif"):
-        set_dialog_edit(row["id"])
-        st.rerun()
+    with cols[4].container(horizontal=True, width="content", vertical_alignment="center"):
+        if st.button("", key=f"mod_{row['id']}", icon=":material/edit_square:", type="tertiary", help="Modifier l'actif"):
+            set_dialog_edit(row["id"])
+            st.rerun()
 
-    if cols[6].button("", key=f"del_{row['id']}", icon=":material/delete:", help="Supprimer l'actif"):
-        set_dialog_delete(row["id"])
-        st.rerun()
+        if st.button("", key=f"del_{row['id']}", icon=":material/delete:", type="tertiary", help="Supprimer l'actif"):
+            set_dialog_delete(row["id"])
+            st.rerun()
 
 
 # ── Point d'entrée public ─────────────────────────────────────────────────────
