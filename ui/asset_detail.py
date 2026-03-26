@@ -96,7 +96,7 @@ def render_price_chart(historical_data: pd.DataFrame, ticker: str, pru: float = 
         tickformat=",.0f"
     )
     
-    st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
+    st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
 
 @st.fragment
 def _render_chart_section(ticker: str, pru: float = None):

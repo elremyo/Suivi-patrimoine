@@ -107,10 +107,10 @@ def _dialog_delete(df, asset_id, invalidate_cache_fn, flash_fn):
 
     st.warning(f"Supprimer **{row['nom']}** ? Cette action est irréversible.")
     c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_delete_cancel"):
+    if c1.button("Annuler", width="stretch", key="_delete_cancel"):
         close_dialog()
         st.rerun()
-    if c2.button("Confirmer", type="primary", use_container_width=True, key="_delete_confirm"):
+    if c2.button("Confirmer", type="primary", width="stretch", key="_delete_confirm"):
         df, msg, msg_type = remove_asset(df, idx, row["id"])
         flash_fn(msg, msg_type)
         close_dialog()
@@ -168,11 +168,11 @@ def _dialog_update(df, asset_id, invalidate_cache_fn, flash_fn):
         )
 
     c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_upd_cancel"):
+    if c1.button("Annuler", width="stretch", key="_upd_cancel"):
         close_dialog()
         st.rerun()
 
-    if c2.button("Enregistrer", type="primary", use_container_width=True, key="_upd_save"):
+    if c2.button("Enregistrer", type="primary", width="stretch", key="_upd_save"):
         if is_auto:
             with st.spinner("Enregistrement…"):
                 df, msg, msg_type = update_at_date(df, asset_id, row["categorie"], op_date=op_date, quantite=quantite, pru=pru)

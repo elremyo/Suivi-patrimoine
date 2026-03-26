@@ -115,10 +115,10 @@ with st.container(horizontal=True, vertical_alignment="bottom", horizontal_align
             ("Immobilier",      ":material/home:",             "Immobilier"),
             ("Fonds euros",     ":material/shield:",           "Fonds euros"),
         ]:
-            if st.button(label, use_container_width=True, icon=icon, key=f"add_{categorie}"):
+            if st.button(label, width="stretch", icon=icon, key=f"add_{categorie}"):
                 set_dialog_create(categorie)
                 st.rerun()
-        if st.button("Crédit / Emprunt", use_container_width=True, icon=":material/credit_card:", key="add_passif"):
+        if st.button("Crédit / Emprunt", width="stretch", icon=":material/credit_card:", key="add_passif"):
             set_emprunt_dialog_create()
             st.rerun()
 

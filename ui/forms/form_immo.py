@@ -198,11 +198,11 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
     }
 
     c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_form_cancel"):
+    if c1.button("Annuler", width="stretch", key="_form_cancel"):
         close_dialog()
         st.rerun()
 
-    if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_form_save"):
+    if c2.button("Sauvegarder", type="primary", width="stretch", key="_form_save"):
         if not nom.strip():
             st.warning("Le nom est obligatoire.")
         else:

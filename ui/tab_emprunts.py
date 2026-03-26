@@ -70,7 +70,7 @@ def _render_crd_chart(df: pd.DataFrame) -> None:
     )
     
     fig.update_yaxes(ticksuffix=" €", tickformat=",.0f")
-    st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
+    st.plotly_chart(fig, width="stretch", config={"staticPlot": True})
 
 def _render_emprunt_row(row: pd.Series):
 

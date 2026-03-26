@@ -128,11 +128,11 @@ def _form_fields(edit_row: pd.Series | None, flash_fn) -> bool:
         )
 
     c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_emprunt_form_cancel"):
+    if c1.button("Annuler", width="stretch", key="_emprunt_form_cancel"):
         _close_dialog()
         st.rerun()
 
-    if c2.button("Sauvegarder", type="primary", use_container_width=True, key="_emprunt_form_save"):
+    if c2.button("Sauvegarder", type="primary", width="stretch", key="_emprunt_form_save"):
         if not nom.strip():
             flash_fn("Le nom de l'emprunt est obligatoire.", "error")
             return False
@@ -201,10 +201,10 @@ def _dialog_delete(emprunt_id: str, flash_fn):
         return
     st.warning(f"Supprimer **{row['nom']}** ? Les biens immobiliers liés ne seront plus associés à cet emprunt.")
     c1, c2 = st.columns(2)
-    if c1.button("Annuler", use_container_width=True, key="_emprunt_delete_cancel"):
+    if c1.button("Annuler", width="stretch", key="_emprunt_delete_cancel"):
         _close_dialog()
         st.rerun()
-    if c2.button("Confirmer", type="primary", use_container_width=True, key="_emprunt_delete_confirm"):
+    if c2.button("Confirmer", type="primary", width="stretch", key="_emprunt_delete_confirm"):
         delete_emprunt(emprunt_id)
         flash_fn("Emprunt supprimé.", "success")
         _close_dialog()

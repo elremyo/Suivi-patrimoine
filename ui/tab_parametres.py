@@ -108,10 +108,10 @@ def _render_contrats(df_assets: pd.DataFrame, invalidate_cache_fn=None):
                 with st.container(border=True):
                     st.warning(f"Supprimer **{display_name}** ? Cette action est irréversible.", icon=":material/warning:")
                     c1, c2 = st.columns(2)
-                    if c1.button("Annuler", use_container_width=True, key=f"cancel_del_contrat_{contrat_id}"):
+                    if c1.button("Annuler", width="stretch", key=f"cancel_del_contrat_{contrat_id}"):
                         st.session_state.pop(deleting_key, None)
                         st.rerun()
-                    if c2.button("Confirmer", type="primary", disabled=is_used, use_container_width=True, key=f"confirm_del_contrat_{contrat_id}"):
+                    if c2.button("Confirmer", type="primary", disabled=is_used, width="stretch", key=f"confirm_del_contrat_{contrat_id}"):
                         ok, msg = delete_contrat(contrat_id)
                         st.toast(msg, icon="✅" if ok else "⚠️")
                         st.session_state.pop(deleting_key, None)
@@ -152,7 +152,7 @@ def render_delete_data(df: pd.DataFrame, invalidate_cache_fn, flash_fn):
                 icon=":material/delete_forever:",
                 type="primary",
                 disabled=confirm_input != "SUPPRIMER",
-                use_container_width=True,
+                width="stretch",
                 key="btn_reset_all",
             ):
                 msg = reset_all_data()

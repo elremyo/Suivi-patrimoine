@@ -140,7 +140,7 @@ def ticker_picker(initial_ticker: str = "") -> dict | None:
 
     if st.button(
         "Vérifier le ticker",
-        use_container_width=True,
+        width="stretch",
         key="_form_verify_btn",
         icon=":material/search_check_2:",
     ):
@@ -170,6 +170,6 @@ def ticker_picker(initial_ticker: str = "") -> dict | None:
 
 def cancel_button(key="_form_cancel_early"):
     """Bouton Annuler affiché seul (avant que le ticker soit validé)."""
-    if st.button("Annuler", use_container_width=True, key=key):
+    if st.button("Annuler", width="stretch", key=key):
         close_dialog()
         st.rerun()
