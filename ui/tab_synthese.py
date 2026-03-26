@@ -59,12 +59,7 @@ def _render_actifs(df: pd.DataFrame):
         if valeur_achat > 0:
             pnl_by_cat[categorie] = valeur_actuelle - valeur_achat
 
-    # En-tête de la liste
-    header_cols = st.columns(repartition_columns)
-    header_cols[0].empty()
-    header_cols[1].caption("Répartition")
-    header_cols[2].caption("Valeur")
-    header_cols[3].caption("Plus/moins-value")
+    # Liste
 
     for _, row in stats.iterrows():
         categorie = row["categorie"]
@@ -83,7 +78,7 @@ def _render_actifs(df: pd.DataFrame):
             )
 
             # Répartition %
-            cols[1].write(f"{row['pourcentage']:.1f} %")
+            cols[1].markdown(f"{row['pourcentage']:.1f} %")
 
             # Valeur
             cols[2].write(f"{row['montant']:,.2f} €")
@@ -154,13 +149,6 @@ def _render_passifs(df_emprunts: pd.DataFrame, total_actifs: float):
     total_emprunts = df_emprunts["capital_restant_du"].fillna(0).sum()
     total_emprunte = df_emprunts["montant_emprunte"].sum()
     
-    # En-tête de la liste
-    header_cols = st.columns(repartition_columns)
-    header_cols[0].empty()
-    header_cols[1].caption("Répartition")
-    header_cols[2].caption("Emprunté")
-    header_cols[3].caption("Restant dû")
-
     # Affichage de la catégorie Emprunts
     color = CATEGORY_COLOR_MAP.get("Emprunts", "#75cbd1")
     pct = (total_emprunts / total_actifs * 100) if total_actifs > 0 else 0
@@ -221,7 +209,6 @@ def render(df: pd.DataFrame, df_hist: pd.DataFrame, df_positions: pd.DataFrame):
             with st.container(border=False):
                 # ── KPIs
                 st.subheader("Patrimoine")
-                st.caption("Répartition et évolution")
                 _render_kpis(df)
 
                 # ── Contrats
