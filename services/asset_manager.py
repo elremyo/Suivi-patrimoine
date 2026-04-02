@@ -63,13 +63,14 @@ def create_manual_asset(
             df.loc[last_idx, k] = v
     asset_id = df.iloc[-1]["id"]
     
+    save_assets(df)
+
     # Utiliser la date d'achat pour l'historique si disponible
     record_date = None
     if categorie == "Immobilier" and immo_params and "date_achat" in immo_params:
         record_date = datetime.strptime(immo_params["date_achat"], "%Y-%m-%d").date()
     
     record_montant(asset_id, montant, record_date)
-    save_assets(df)
 
     return df, "Actif ajouté", "success"
 
