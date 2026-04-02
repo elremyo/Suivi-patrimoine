@@ -20,11 +20,7 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
 
     contrat_id = contrat_fields(row if mode == "edit" else None)
 
-    col_nom, col_montant = st.columns(2)
-    with col_nom:
-        nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
-    with col_montant:
-        montant = st.number_input("Montant (€)", min_value=0.0, value=initial_montant, step=100.0, key="_form_montant")
+    nom = st.text_input("Nom *", value=initial_nom, key="_form_nom")
 
     c1, c2 = st.columns(2)
     if c1.button("Annuler", width="stretch", key="_form_cancel"):
