@@ -106,15 +106,12 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
     # ── Quantité (actifs auto uniquement) ─────────────────────────────────────
     if is_auto_row:
         cols[1].caption(f'{row["quantite"]:g} unités')
+        cols[1].caption(f'PRU : {row["pru"]:,.2f} €')
 
-    # ── Montant ───────────────────────────────────────────────────────────────
-    with cols[2].container(horizontal=True, width="content", vertical_alignment="center"):
-        if row["categorie"] == "Immobilier":
-            st.empty()
-        else:
-            pass
-        st.write(f"{row['montant']:,.2f} €")
-
+    # ── Prix actuel de l'actif ────────────────────────────────────────────────
+    if is_auto_row:
+        prix_par_part = row["montant"] / row["quantite"] if row.get("quantite", 0) > 0 else 0
+        cols[2].caption(f'Prix : {prix_par_part:,.2f} €')
 
     # ── PnL (actifs auto avec PRU) ────────────────────────────────────────────
     with cols[3].container(horizontal=True, width="content", vertical_alignment="center"):
@@ -127,7 +124,7 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
             ):
                 set_dialog_update(row["id"])
                 st.rerun()
-        st.write(f"{row['montant']:,.2f} €")
+        st.markdown(f"**{row['montant']:,.2f} €**")
 
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
         pnl_metrics = calculate_auto_asset_pnl(row["montant"], row["pru"], row["quantite"])
