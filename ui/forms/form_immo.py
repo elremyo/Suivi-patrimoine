@@ -47,7 +47,7 @@ def render_form(df, mode, idx, row, invalidate_cache_fn, flash_fn, categorie=Non
             key="_form_date_achat",
         )
 
-    type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "autre"
+    type_bien_val = str(row.get("type_bien", "") or "autre").strip().lower() if mode == "edit" else "appartement"
     if type_bien_val not in TYPE_BIEN_OPTIONS:
         type_bien_val = "autre"
 
