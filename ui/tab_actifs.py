@@ -24,7 +24,7 @@ from services.financial_calculations import calculate_rental_metrics, calculate_
 
 def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_emprunts: pd.DataFrame = None):    
     is_auto_row = row["categorie"] in CATEGORIES_AUTO
-    cols = st.columns([4, 2, 2, 2, 0.5], vertical_alignment="center")
+    cols = st.columns([4, 1, 1, 2, 0.5], vertical_alignment="center")
 
     # ── Colonne nom + infos discrètes ─────────────────────────────────────────
     contrat_id_val = row.get("contrat_id", "")
