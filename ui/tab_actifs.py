@@ -112,9 +112,15 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
         if row["categorie"] == "Immobilier":
             st.empty()
         else:
-            if st.button(
+            pass
+        st.write(f"{row['montant']:,.2f} €")
+
+
+    # ── PnL (actifs auto avec PRU) ────────────────────────────────────────────
+    with cols[3].container(horizontal=True, width="content", vertical_alignment="center"):
+        if st.button(
                 "",
-                key=f"upd_{row['id']}",
+                key=f"updd_{row['id']}",
                 icon=":material/history:",
                 help="Mettre à jour à une date",
                 type="tertiary"
@@ -123,8 +129,6 @@ def _render_asset_row(row: pd.Series, df_contrats: pd.DataFrame = None, df_empru
                 st.rerun()
         st.write(f"{row['montant']:,.2f} €")
 
-
-    # ── PnL (actifs auto avec PRU) ────────────────────────────────────────────
     if is_auto_row and row.get("quantite", 0) > 0 and row.get("pru", 0) > 0:
         pnl_metrics = calculate_auto_asset_pnl(row["montant"], row["pru"], row["quantite"])
         pnl = pnl_metrics["pnl_absolu"]
